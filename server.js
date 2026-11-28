@@ -36051,7 +36051,7 @@ function hotelTitleLine(hotel) {
 }
 // Where, when and how much on a guest-page event card, plus a short description (2026-11-28, Dayton: "a little more info on the
 // event cards"). Reads the event's own venue, its next occurrence's time and its price; any part that is missing is left out.
-function hotelEventInfoHtml(e) {
+function hotelEventInfoHtml(e, hotel) {
   try {
     const row = db.prepare('SELECT venue_id, venue_name_text FROM events WHERE id = ?').get(e.id) || {};
     let place = row.venue_name_text || '';
@@ -36064,7 +36064,13 @@ function hotelEventInfoHtml(e) {
     const price = eventPriceLabel(e);
     let desc = String(e.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     if (desc.length > 110) desc = desc.slice(0, 110).replace(/\s+\S*$/, '') + '\u2026';
-    const facts = [place && `<span class="ht-ev-fact">\ud83d\udccd ${escapeHtml(place)}</span>`, time && `<span class="ht-ev-fact">\ud83d\udd52 ${escapeHtml(time)}</span>`, price && `<span class="ht-ev-fact ht-ev-price">${escapeHtml(price)}</span>`].filter(Boolean);
+    let away = '';
+    // An event that only names its place ("The View Winery - 2287 Ward Rd") still gets a distance when that place is a listed venue in the town.
+    let vr0 = null;
+    if (hotel && row.venue_id) vr0 = db.prepare('SELECT latitude, longitude FROM venues WHERE id = ?').get(row.venue_id);
+    else if (hotel && place && e.region) vr0 = db.prepare("SELECT latitude, longitude FROM venues WHERE region = ? AND redirect_to IS NULL AND length(name) >= 6 AND lower(?) LIKE lower(name) || '%' ORDER BY length(name) DESC LIMIT 1").get(e.region, place);
+    if (hotel && vr0) { const vr = vr0; if (vr && vr.latitude != null && hotel.latitude != null) { const km = haversineKm(Number(hotel.latitude), Number(hotel.longitude), Number(vr.latitude), Number(vr.longitude)); if (Number.isFinite(km)) away = hotelAwayText(km) + (hotelIsRental(hotel) ? (hotelIsSkiHill(hotel) ? ' from the village' : ' from downtown') : ''); } }
+    const facts = [place && `<span class="ht-ev-fact">\ud83d\udccd ${escapeHtml(place)}</span>`, away && `<span class="ht-ev-fact">${/walk/.test(away) ? '\ud83d\udeb6' : '\ud83d\ude97'} ${escapeHtml(away)}</span>`, time && `<span class="ht-ev-fact">\ud83d\udd52 ${escapeHtml(time)}</span>`, price && `<span class="ht-ev-fact ht-ev-price">${escapeHtml(price)}</span>`].filter(Boolean);
     return `${facts.length ? `<span class="ht-ev-facts">${facts.join('')}</span>` : ''}${desc ? `<span class="ht-ev-desc">${escapeHtml(desc)}</span>` : ''}`;
   } catch (err) { return ''; }
 }
@@ -36092,7 +36098,7 @@ const HOTEL_PAGE_GROUPS = [
 // fans, not on a hotel guest's short "this week" list (2026-11-26).
 const HOTEL_EVENT_SKIP = /\b(home games|schedule 20\d\d|20\d\d[\u2013-]\d{2,4} season)\b/i;
 // This week's events on a guest page: the first HOTEL_EVENTS_SHOWN show, the rest sit behind "Show all" (2026-11-26).
-const HOTEL_EVENTS_SHOWN = 8;
+const HOTEL_EVENTS_SHOWN = 9;
 const HOTEL_EVENTS_MAX = 40;
 const HOTEL_OPENS_SOON_DAYS = 75;
 const HOTEL_QR_UTM = (slug) => `utm_source=${slug}&utm_medium=hotel_qr`;
@@ -36732,7 +36738,7 @@ function renderHotelPage(hotel, now = new Date()) {
     const bk = bookable.get(v.id) || null;
     if (bk) anyBookable = true;
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${hotelIsRental(hotel) ? '' : (() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}</span>`; })()}</span><span class="ht-body"><span class="ht-kick">${escapeHtml(hotelCardKicker(v, typeLabel))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${hotelCardDesc(v) ? `<span class="ht-desc">${escapeHtml(hotelCardDesc(v))}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${(() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}${hotelIsRental(hotel) ? escapeHtml(hotelIsSkiHill(hotel) ? ' from the village' : ' from downtown') : ''}</span>`; })()}</span><span class="ht-body"><span class="ht-kick">${escapeHtml(hotelCardKicker(v, typeLabel))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${hotelCardDesc(v) ? `<span class="ht-desc">${escapeHtml(hotelCardDesc(v))}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
       <div class="ht-actions"><a class="ht-details" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}" tabindex="-1" aria-hidden="true" data-ht-cta="details">View details <span>\u2192</span></a><button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>${bk ? `<a class="ht-book-btn" href="${escapeHtml(bk.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(bk.code)}" aria-label="${escapeHtml(`Book ${v.name} on Viator`)}">Book now <span aria-hidden="true">\u2197</span></a>` : ''}</div>
     </li>`;
   };
@@ -36744,7 +36750,7 @@ function renderHotelPage(hotel, now = new Date()) {
     // An event's own photo (a file on this site) wins over the shared category photo (2026-11-27, Dayton: events cannot share one).
     if (own && /^\/images\/events\/[A-Za-z0-9._-]+$/.test(String(own).split('?')[0])) pic = String(own);
     else { try { pic = eventImagePath({ ...e, image_url: own }, e.categories || []); } catch (err) { pic = ''; } }
-    return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span>${hotelEventInfoHtml(e)}</a></li>` : '';
+    return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span>${hotelEventInfoHtml(e, hotel)}</a></li>` : '';
   };
   const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
   const description = hotelIsRental(hotel)
