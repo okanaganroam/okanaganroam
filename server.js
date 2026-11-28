@@ -36791,6 +36791,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page h2[id^="ht-"]::before { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.55em; height: 1.55em; margin-right: 0 !important; border-radius: 14px; background: #fff4df; font-size: 0.78em; box-shadow: inset 0 0 0 1px rgba(27,43,58,0.08); }
   body.hotel-page .ht-sub { margin: 0 0 16px; font-size: 1.02rem; line-height: 1.4; color: #5b6772; }
   body.hotel-page h2[id^="ht-"] + .ht-list, body.hotel-page h2[id^="ht-"] + .ht-events, body.hotel-page h2[id^="ht-"] + .ht-trips { margin-top: 14px; }
+  /* The dark "whole Okanagan" card keeps a white title and a dark button label (the navy title colour above had hidden them). */
+  body.hotel-page .ht-section.ht-valley h2[id="ht-valley"] { color: #fff !important; font-size: clamp(1.45rem, 5.4vw, 1.8rem); margin-bottom: 6px; }
+  body.hotel-page .ht-section.ht-valley h2[id="ht-valley"]::before { background: #fff4df; }
+  body.hotel-page .ht-section.ht-valley a.ht-valley-cta, body.hotel-page .ht-section.ht-valley a.ht-valley-cta:visited { color: #1B2B3A !important; }
   body.hotel-page .ht-event, body.hotel-page .ht-trip { border: 0; border-radius: 20px; gap: 4px; padding: 0 0 14px; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 8px 24px rgba(27,43,58,0.10); }
   body.hotel-page .ht-event img, body.hotel-page .ht-trip img { height: auto; aspect-ratio: 16 / 10; object-fit: cover; margin: 0 0 10px; background: #e8edf2; transition: transform .45s ease; }
   @media (hover: hover) { body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: scale(1.05); } }
