@@ -36797,6 +36797,24 @@ ${renderAnalyticsHeadHtml('hotel')}
   }
   body.hotel-page .ht-events-more summary::after { content: '\\25BE'; margin-left: 8px; font-size: 0.9em; transition: transform .15s ease; }
   body.hotel-page .ht-events-more[open] summary::after { transform: rotate(180deg); }
+  /* Tight, lined-up cards (2026-11-28, Dayton): navy names (never the gold hover colour), the hours line as clean text with its dot,
+     name and hours the same height across a row (script below), badges on one line with "+N", buttons filling the bottom edge. */
+  body.hotel-page .ht-card .ht-link, body.hotel-page .ht-card .ht-link:hover, body.hotel-page .ht-card .ht-link:focus, body.hotel-page .ht-event:hover, body.hotel-page .ht-trip:hover { color: var(--ref-navy, #1B2B3A); }
+  @media (hover: hover) { body.hotel-page .ht-card .ht-link:hover .ht-name, body.hotel-page .ht-event:hover .ht-name, body.hotel-page .ht-trip:hover .ht-name { text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; } }
+  body.hotel-page .ht-card .ht-body { gap: 6px; padding: 12px 14px 0; }
+  body.hotel-page .ht-card .ht-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; font-size: 1.08rem; line-height: 1.22; }
+  body.hotel-page .ht-card .ht-open, body.hotel-page .ht-card .ht-soon { position: relative; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; width: 100%; box-sizing: border-box; margin: 0; padding: 0 0 0 15px; border-radius: 0; background: none; font-size: 0.82rem; font-weight: 800; line-height: 1.35; }
+  body.hotel-page .ht-card .ht-open { color: #1e7a3c; }
+  body.hotel-page .ht-card .ht-soon { color: #55667a; font-weight: 700; }
+  body.hotel-page .ht-card .ht-open::before, body.hotel-page .ht-card .ht-soon::before { position: absolute; left: 0; top: 0.42em; width: 8px; height: 8px; margin: 0; transform: none; }
+  body.hotel-page .ht-card .ht-open::before { box-shadow: 0 0 0 3px rgba(34,160,75,0.16); }
+  body.hotel-page .ht-card .ht-hh { width: 100%; box-sizing: border-box; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; padding: 6px 10px; }
+  body.hotel-page .ht-card .ht-tags { flex-wrap: nowrap; max-height: none; min-height: 27px; gap: 6px; margin-top: 2px; }
+  body.hotel-page .ht-card .ht-tags span[hidden] { display: none; }
+  body.hotel-page .ht-card .ht-tags .ht-tag-more { background: #f1f4f8; border-color: transparent; color: #3a4b5c; font-weight: 800; }
+  body.hotel-page .ht-card .ht-actions { margin: 12px 14px 14px; gap: 8px; flex-wrap: nowrap; }
+  body.hotel-page .ht-card .ht-actions > * { flex: 1 1 0; min-width: 0; justify-content: center; min-height: 40px; padding: 0 10px; font-size: 0.88rem; border-width: 1px; white-space: nowrap; }
+  body.hotel-page .ht-card .trip-btn { border: 1px solid rgba(27,43,58,0.18); background: #f6f8fa; }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
@@ -36917,6 +36935,40 @@ document.addEventListener('click', function(e){
   var c = a.closest('.ht-card');
   window.trackEvent('hotel_page_click', { hotel: hotel, link_url: a.getAttribute('href'), venue_id: c ? Number(c.getAttribute('data-venue-id')) : null, link_type: a.classList.contains('ht-tour-book') ? 'viator' : undefined });
 });
+// Cards line up (2026-11-28): in each row the names are the same height and so are the hours lines; badges stay on one line, and a
+// badge that does not fit is hidden whole and counted in a small "+N" at the end, never cut.
+(function () {
+  function fit() {
+    document.querySelectorAll('.ht-card .ht-tags').forEach(function (row) {
+      var more = row.querySelector('.ht-tag-more'); if (more) more.remove();
+      var tags = Array.prototype.slice.call(row.children); tags.forEach(function (t) { t.hidden = false; });
+      if (!row.clientWidth || row.scrollWidth <= row.clientWidth + 1) return;
+      more = document.createElement('span'); more.className = 'ht-tag-more'; row.appendChild(more);
+      var n = 0;
+      for (var i = tags.length - 1; i >= 1 && row.scrollWidth > row.clientWidth + 1; i--) { tags[i].hidden = true; n++; more.textContent = '+' + n; }
+      if (!n) more.remove();
+    });
+    document.querySelectorAll('.ht-list').forEach(function (list) {
+      var rows = {};
+      Array.prototype.forEach.call(list.children, function (c) {
+        ['.ht-name', '.ht-open, .ht-soon'].forEach(function (s) { var e = c.querySelector(s); if (e) e.style.minHeight = ''; });
+        if (c.offsetParent) { var t = c.offsetTop; (rows[t] = rows[t] || []).push(c); }
+      });
+      Object.keys(rows).forEach(function (t) {
+        ['.ht-name', '.ht-open, .ht-soon'].forEach(function (s) {
+          var els = rows[t].map(function (c) { return c.querySelector(s); }).filter(Boolean), max = 0;
+          els.forEach(function (e) { max = Math.max(max, e.getBoundingClientRect().height); });
+          if (max) els.forEach(function (e) { e.style.minHeight = Math.ceil(max) + 'px'; });
+        });
+      });
+    });
+  }
+  var q = false; function queue() { if (!q) { q = true; requestAnimationFrame(function () { q = false; fit(); }); } }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', queue); else queue();
+  window.addEventListener('load', queue); window.addEventListener('resize', queue);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+  document.addEventListener('toggle', queue, true); document.addEventListener('click', function () { setTimeout(queue, 60); });
+})();
 </script>
 </body>
 </html>`;
