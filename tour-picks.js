@@ -146,6 +146,27 @@ function guestPicks(hotel, ctx = {}, limit = 3) {
   return out;
 }
 
+// Every bookable product a guest page can offer, by the listing it belongs to (2026-11-27, Dayton): the cards for those
+// places get a "Book now" beside "Add to trip" instead of a separate "Book a tour" row. One product per listing: the
+// strongest one (pinned first, then quality, then nearest).
+function bookableByVenue(hotel, ctx = {}) {
+  const out = new Map();
+  if (!hotel) return out;
+  const data = ctx.data || loadData();
+  const onHill = HILL_REGIONS.has(hotel.region);
+  const rows = [];
+  for (const c of candidates({ ...ctx, data })) {
+    if (!c.venue || !wellReviewed(c.meta, data, data.minReviews)) continue;
+    if (onHill && c.venue.region !== hotel.region) continue;
+    const d = km(hotel, c.venue);
+    if (d === null || d > (Number.isFinite(c.meta.maxKm) ? c.meta.maxKm : data.maxKm)) continue;
+    rows.push({ ...c, km: d, score: quality(c) - 0.01 * d });
+  }
+  rows.sort((a, b) => (b.pin - a.pin) || b.score - a.score || a.code.localeCompare(b.code));
+  for (const r of rows) if (!out.has(r.venue.id)) out.set(r.venue.id, { code: r.code, url: r.url, title: r.title });
+  return out;
+}
+
 const hasOwnPhoto = (v) => !!(v && /^(?:https:\/\/|\/images\/)[^'"()\s<>]+$/.test(String(v.image_url || '').trim()));
 
 // ISO 8601 week number of a YYYY-MM-DD date.
@@ -230,4 +251,4 @@ function guestRowHtml(picks, opts = {}) {
   </section>`;
 }
 
-module.exports = { TEXT, loadData, clearCache, km, inSeason, candidates, quality, guestPicks, isoWeek, emailPick, linkFor, guestRowHtml };
+module.exports = { bookableByVenue, TEXT, loadData, clearCache, km, inSeason, candidates, quality, guestPicks, isoWeek, emailPick, linkFor, guestRowHtml };
