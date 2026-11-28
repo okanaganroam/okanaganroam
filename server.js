@@ -36744,7 +36744,6 @@ ${renderGolfHeaderHtml()}
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
     ${g.more && g.more.length ? `<details class="ht-events-more ht-places-more"><summary>View all ${g.more.length + g.items.length} ${escapeHtml(g.key === 'eat' ? 'places to eat and drink' : g.title.toLowerCase())}</summary><ul class="ht-list ht-list-more">${g.more.map(({ v, km }) => card(v, km)).join('')}</ul></details>` : ''}
   </section>`).join('\n  ')}
-  ${anyBookable ? `<p class="ht-tours-note venue-viator-note" data-viator-disclosure>${escapeHtml(viator.DISCLOSURE.en)}</p>` : ''}
   ${events.length ? `<section class="ht-section" aria-labelledby="ht-events">
     <h2 id="ht-events">${escapeHtml(eventsTitle)}</h2>
     <ul class="ht-events">${events.slice(0, HOTEL_EVENTS_SHOWN).map(eventItem).join('')}</ul>
