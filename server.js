@@ -21341,6 +21341,10 @@ const FOOTER_REGION_GROUPS = [
 // absolute, context-independent URL and is unaffected either way.
 // Every page except the homepage gets the short homepage-style footer (2026-11-28, Dayton). The homepage calls this with no
 // argument and still gets the full footer, which home-simple.js turns into its own short one.
+// The town, ski-resort and Kelowna landing pages carry their own one-line footer; swap it for the short homepage-style one (2026-11-28, Dayton).
+function withShortFooter(html) {
+  return String(html).replace(/<footer class="bw-footer">[\s\S]*?<\/footer>/, () => renderHomeFooterHTML(true));
+}
 function renderHomeFooterHTML(fromBrowse) {
   const full = renderHomeFooterFullHTML(fromBrowse);
   return fromBrowse ? homeSimple.compactFooter(full) : full;
@@ -32351,7 +32355,7 @@ ${kelownaPage.styles}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page kelowna-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${kelownaPage.renderBody({ count: placeCount, activeSlugs })}
+${withShortFooter(kelownaPage.renderBody({ count: placeCount, activeSlugs }))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
@@ -32365,7 +32369,7 @@ ${townPages.styles(region)}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page town-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${townPages.renderBody(region, { count: placeCount, activeSlugs, officialHtml: regionOfficialLinkHtml(region).trim() })}
+${withShortFooter(townPages.renderBody(region, { count: placeCount, activeSlugs, officialHtml: regionOfficialLinkHtml(region).trim() }))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
@@ -32382,7 +32386,7 @@ ${skiResortPages.styles(region)}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page ski-resort-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${skiResortPages.renderBody(region, { count: placeCount, status, activeSlugs, season })}
+${withShortFooter(skiResortPages.renderBody(region, { count: placeCount, status, activeSlugs, season }))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
@@ -32399,7 +32403,7 @@ ${hotelIsSkiMonth() ? bigWhitePage.styles.replace('/images/regions/photos/big-wh
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page big-white-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${bigWhitePage.renderBody({ count: placeCount, status, activeSlugs })}
+${withShortFooter(bigWhitePage.renderBody({ count: placeCount, status, activeSlugs }))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
