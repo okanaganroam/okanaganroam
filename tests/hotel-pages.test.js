@@ -182,8 +182,11 @@ test('QR card + page polish (2026-11-26): open-late chip flag, shorter intro, ca
   assert.ok(app.hotelVenueFlags({ open_late: 1 }, false).includes('late'));
   assert.ok(!app.hotelVenueFlags({}, false).includes('late'));
   const hotel = app.hotelList().find((h) => !app.hotelIsRental(h));
-  const page = app.renderHotelPage(hotel, new Date('2026-11-25T19:00:00Z'));
+  const page = app.renderHotelPage(hotel, new Date('2026-07-15T19:00:00Z'));
   assert.match(page, /class="ht-intro">What(&#39;|')s open near [^<]+ right now, closest first\./);
+  // In the ski months every town page has its winter header photo instead of the intro line (2026-11-28).
+  const winterPage = app.renderHotelPage(hotel, new Date('2026-11-25T19:00:00Z'));
+  assert.ok(winterPage.includes('class="ht-hero"') && !winterPage.includes('class="ht-intro"'));
   const card = app.renderHotelCard(hotel);
   assert.ok(card.includes('valley-wide'));
   assert.ok(card.includes('Free, no app.'));
