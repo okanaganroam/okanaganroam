@@ -36544,6 +36544,16 @@ function hotelOpensLabel(v, dateStr) {
   } catch (e) { /* label stays as the date only */ }
   return lbl;
 }
+// Guest card kicker and description (2026-11-28): like the listing cards -- "WEST COAST \u00b7 4.8\u2605", then the first sentence or two.
+function hotelCardKicker(v, typeLabel) {
+  const kind = String(v.cuisine || '').trim() || typeLabel;
+  const r = Number(v.rating);
+  return r >= 3 ? `${kind} \u00b7 ${r.toFixed(1)}\u2605` : kind;
+}
+function hotelCardDesc(v) {
+  const d = String(v.description || '').replace(/\s+/g, ' ').trim();
+  return d.length > 180 ? `${d.slice(0, 177).replace(/\s+\S*$/, '')}\u2026` : d;
+}
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
@@ -36620,8 +36630,8 @@ function renderHotelPage(hotel, now = new Date()) {
     const bk = bookable.get(v.id) || null;
     if (bk) anyBookable = true;
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${hotelIsRental(hotel) ? '' : (() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}</span>`; })()}</span><span class="ht-body"><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
-      <div class="ht-actions"><button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>${bk ? `<a class="ht-book-btn" href="${escapeHtml(bk.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(bk.code)}" aria-label="${escapeHtml(`Book ${v.name} on Viator`)}">Book now <span aria-hidden="true">\u2197</span></a>` : ''}</div>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${hotelIsRental(hotel) ? '' : (() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}</span>`; })()}</span><span class="ht-body"><span class="ht-kick">${escapeHtml(hotelCardKicker(v, typeLabel))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${hotelCardDesc(v) ? `<span class="ht-desc">${escapeHtml(hotelCardDesc(v))}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
+      <div class="ht-actions"><a class="ht-details" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}" tabindex="-1" aria-hidden="true" data-ht-cta="details">View details <span>\u2192</span></a><button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>${bk ? `<a class="ht-book-btn" href="${escapeHtml(bk.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(bk.code)}" aria-label="${escapeHtml(`Book ${v.name} on Viator`)}">Book now <span aria-hidden="true">\u2197</span></a>` : ''}</div>
     </li>`;
   };
   const eventItem = (e) => {
@@ -36815,6 +36825,31 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card .ht-actions { margin: 12px 14px 14px; gap: 8px; flex-wrap: nowrap; }
   body.hotel-page .ht-card .ht-actions > * { flex: 1 1 0; min-width: 0; justify-content: center; min-height: 40px; padding: 0 10px; font-size: 0.88rem; border-width: 1px; white-space: nowrap; }
   body.hotel-page .ht-card .trip-btn { border: 1px solid rgba(27,43,58,0.18); background: #f6f8fa; }
+  /* Guest cards look like the listing cards (2026-11-28, Dayton: "make them all look like this"): gold kicker (kind, rating),
+     serif name, open/closed pill, a two-line description, outlined badges, then a rule with View details and Add to trip. */
+  body.hotel-page .ht-card .ht-cat { display: none; }
+  body.hotel-page .ht-card .ht-body { gap: 0; padding: 14px 16px 0; }
+  body.hotel-page .ht-card .ht-kick { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--ref-gold-ink, #8A6A0F); margin: 0 0 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  body.hotel-page .ht-card .ht-name { font-family: 'Fraunces', 'Fraunces Fallback', Georgia, serif; font-weight: 600; font-size: 1.22rem; line-height: 1.2; letter-spacing: -0.01em; margin: 0 0 10px; }
+  body.hotel-page .ht-card .ht-open, body.hotel-page .ht-card .ht-soon { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; align-self: flex-start; width: auto; max-width: 100%; padding: 4px 12px 4px 24px; border-radius: 14px; font-size: 0.8rem; font-weight: 800; line-height: 1.35; }
+  body.hotel-page .ht-card .ht-open { background: #e6f4ea; color: #1e6b34; }
+  body.hotel-page .ht-card .ht-soon { background: #f1f4f8; color: #3a4b5c; font-weight: 700; }
+  body.hotel-page .ht-card .ht-open::before, body.hotel-page .ht-card .ht-soon::before { left: 10px; top: calc(4px + 0.42em); }
+  body.hotel-page .ht-card .ht-open::before { box-shadow: none; }
+  body.hotel-page .ht-card .ht-hh { margin: 8px 0 0; }
+  body.hotel-page .ht-card .ht-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; margin: 10px 0 0; font-size: 0.92rem; font-weight: 400; line-height: 1.45; color: #5b4f47; }
+  body.hotel-page .ht-card .ht-tags { margin: 12px 0 0; }
+  body.hotel-page .ht-card .ht-tags span { padding: 4px 11px; font-size: 0.76rem; color: var(--teal-deep, #1E4F4C); border-color: rgba(27,43,58,0.16); }
+  body.hotel-page .ht-card .ht-actions { margin: 14px 16px 14px; padding-top: 12px; border-top: 1px solid rgba(27,43,58,0.1); gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+  body.hotel-page .ht-card .ht-actions > * { flex: 0 0 auto; }
+  body.hotel-page .ht-card .ht-actions a.ht-details { margin-right: auto; min-height: 40px; padding: 0; border: 0; background: none; display: inline-flex; align-items: center; gap: 6px; color: var(--ref-navy, #1B2B3A); font-weight: 800; font-size: 0.92rem; text-decoration: none; }
+  body.hotel-page .ht-card .ht-actions a.ht-details span { transition: transform .15s ease; }
+  @media (hover: hover) { body.hotel-page .ht-card:hover .ht-actions a.ht-details span { transform: translateX(3px); } }
+  body.hotel-page .ht-card .trip-btn { min-height: 38px; padding: 0 13px; border: 1.5px solid rgba(42,107,103,0.45); background: #fff; color: var(--teal-deep, #1E4F4C); font-size: 0.82rem; font-weight: 800; }
+  @media (hover: hover) { body.hotel-page .ht-card .trip-btn:hover { background: var(--teal, #2A6B67); border-color: var(--teal, #2A6B67); color: #fff; } }
+  body.hotel-page .ht-card .ht-book-btn { min-height: 38px; padding: 0 13px; font-size: 0.82rem; background: var(--teal, #2A6B67); border-color: var(--teal, #2A6B67); color: #fff; }
+  @media (max-width: 640px) { body.hotel-page .ht-card { flex-basis: 78%; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { flex-basis: 100%; } }
+  @media (min-width: 861px) { body.hotel-page .ht-card .ht-actions { flex-wrap: nowrap; } body.hotel-page .ht-card .ht-actions a.ht-details { font-size: 0.86rem; white-space: nowrap; } body.hotel-page .ht-card .trip-btn, body.hotel-page .ht-card .ht-book-btn { padding: 0 11px; font-size: 0.8rem; white-space: nowrap; } body.hotel-page .ht-list:not(:has(> li:nth-child(6):last-child)):not(:has(> li:nth-child(9):last-child)):not(:has(> li:nth-child(3):last-child)) .trip-btn svg { display: none; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details span { display: none; } }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
@@ -36951,15 +36986,19 @@ document.addEventListener('click', function(e){
     document.querySelectorAll('.ht-list').forEach(function (list) {
       var rows = {};
       Array.prototype.forEach.call(list.children, function (c) {
-        ['.ht-name', '.ht-open, .ht-soon'].forEach(function (s) { var e = c.querySelector(s); if (e) e.style.minHeight = ''; });
+        ['.ht-name', '.ht-desc'].forEach(function (s) { var e = c.querySelector(s); if (e) e.style.minHeight = ''; });
+        var st0 = c.querySelector('.ht-open, .ht-soon'); if (st0) st0.style.marginBottom = '';
         if (c.offsetParent) { var t = c.offsetTop; (rows[t] = rows[t] || []).push(c); }
       });
       Object.keys(rows).forEach(function (t) {
-        ['.ht-name', '.ht-open, .ht-soon'].forEach(function (s) {
+        ['.ht-name', '.ht-desc'].forEach(function (s) {
           var els = rows[t].map(function (c) { return c.querySelector(s); }).filter(Boolean), max = 0;
           els.forEach(function (e) { max = Math.max(max, e.getBoundingClientRect().height); });
           if (max) els.forEach(function (e) { e.style.minHeight = Math.ceil(max) + 'px'; });
         });
+        var sts = rows[t].map(function (c) { return c.querySelector('.ht-open, .ht-soon'); }).filter(Boolean), smax = 0;
+        sts.forEach(function (e) { smax = Math.max(smax, e.getBoundingClientRect().height); });
+        sts.forEach(function (e) { var d = smax - e.getBoundingClientRect().height; if (d > 0.5) e.style.marginBottom = Math.round(d) + 'px'; });
       });
     });
   }
