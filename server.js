@@ -36823,6 +36823,11 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-event .ht-ev-facts { display: flex; flex-direction: column; gap: 3px; padding: 4px 14px 0; font-size: 0.88rem; line-height: 1.3; color: #3b4854; font-weight: 600; }
   body.hotel-page .ht-event .ht-ev-price { color: #1d6b4a; font-weight: 800; }
   body.hotel-page .ht-event .ht-ev-desc { padding: 6px 14px 0; font-size: 0.88rem; line-height: 1.4; color: #5b6772; }
+  /* Equal-height event cards in every row (2026-11-28, Dayton: uneven lengths look unprofessional): the card fills its grid cell, long titles and descriptions stop at three lines. */
+  body.hotel-page .ht-events > li { display: flex; }
+  body.hotel-page .ht-events .ht-event { flex: 1 1 auto; width: 100%; }
+  body.hotel-page .ht-event .ht-name, body.hotel-page .ht-event .ht-ev-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; }
+  body.hotel-page .ht-event .ht-ev-desc { flex: 1 1 auto; }
   /* Badges are never cut mid-word (2026-11-28): they wrap, up to two rows; a badge that does not fit drops out whole. */
   body.hotel-page .ht-card .ht-tags { flex-wrap: wrap; overflow: hidden; max-width: 100%; max-height: 58px; }
   body.hotel-page .ht-card .ht-tags span { flex: none; white-space: nowrap; }
