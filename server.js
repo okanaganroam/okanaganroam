@@ -36500,7 +36500,7 @@ function hotelHoursLine(v, status, now) {
       if (label && label.text && label.state !== 'unknown') return { text: label.text, open: label.state === 'open' };
     }
   } catch (e) { /* fall through */ }
-  return { text: hotelHoursNote(v.id) || (v.type === 'outdoor' ? 'Open access; no set hours' : 'Hours on their page'), open: false };
+  return { text: hotelHoursNote(v.id) || (v.type === 'outdoor' ? 'Open access; no set hours' : (v.phone ? `Call ${String(v.phone).replace(/^\+1[ -]?/, '')} for hours` : 'Call for hours')), open: false };
 }
 // "Opens Dec 3 · 11 AM–9 PM": the opening date plus the place's own hours that weekday (2026-11-27, Dayton: every card shows hours or when it opens, with its hours).
 function hotelOpensLabel(v, dateStr) {
