@@ -36548,7 +36548,8 @@ function renderHotelPage(hotel, now = new Date()) {
     }
   }
   const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
-  const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon, now);
+  // Guest pages show only places with their own photo (2026-11-28, Dayton): a card with no photo stays off the page.
+  const groups = hotelPageGroups(hotel, venues.filter((v) => venueThumbPhoto(v)), info, closedIds, opensSoon, now);
   const town = REGION_LABELS[hotel.region] || hotel.region;
   const today = todayLocal(now);
   const weekEnd = new Date(`${today}T12:00:00Z`); weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
