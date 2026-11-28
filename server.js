@@ -36485,16 +36485,16 @@ function hotelHoursNote(id) {
   return typeof n === 'string' && n.trim() ? n.trim() : '';
 }
 function hotelHoursLine(v, status, now) {
-  if (status && status.state && status.text) return status.text;
+  if (status && status.state && status.text) return { text: status.text, open: status.state === 'open' };
   try {
     if (v.hours && hoursModule) {
       const raw = hoursWithExtras(v, now);
       const clock = okanaganClock(now);
       const label = hoursModule.hoursStatusLabel(hoursModule.statusAt(hoursModule.parseHours(raw), clock), clock);
-      if (label && label.text && label.state !== 'unknown') return label.text;
+      if (label && label.text && label.state !== 'unknown') return { text: label.text, open: label.state === 'open' };
     }
   } catch (e) { /* fall through */ }
-  return hotelHoursNote(v.id) || 'Hours on their page';
+  return { text: hotelHoursNote(v.id) || (v.type === 'outdoor' ? 'Open access; no set hours' : 'Hours on their page'), open: false };
 }
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
@@ -36559,7 +36559,7 @@ function renderHotelPage(hotel, now = new Date()) {
       hh = d && d.en && d.en.length ? happyHourDealsCompact(d.en, 2) : '';
     }
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : `<span class="ht-soon">${escapeHtml(hotelHoursLine(v, status, now))}</span>`}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
       <button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>
     </li>`;
   };
@@ -36567,7 +36567,10 @@ function renderHotelPage(hotel, now = new Date()) {
     const href = discoveryEventUrl(e);
     const label = upcomingEventDateLabel(e.nextDate, e.nextEndDate, now);
     let pic = '';
-    try { pic = eventImagePath({ ...e, image_url: e.image_url || e.image || null }, e.categories || []); } catch (err) { pic = ''; }
+    const own = e.image_url || e.image || null;
+    // An event's own photo (a file on this site) wins over the shared category photo (2026-11-27, Dayton: events cannot share one).
+    if (own && /^\/images\/events\/[A-Za-z0-9._-]+$/.test(String(own).split('?')[0])) pic = String(own);
+    else { try { pic = eventImagePath({ ...e, image_url: own }, e.categories || []); } catch (err) { pic = ''; } }
     return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
   };
   const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
