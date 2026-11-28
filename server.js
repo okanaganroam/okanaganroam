@@ -36850,6 +36850,15 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card .ht-book-btn { min-height: 38px; padding: 0 13px; font-size: 0.82rem; background: var(--teal, #2A6B67); border-color: var(--teal, #2A6B67); color: #fff; }
   @media (max-width: 640px) { body.hotel-page .ht-card { flex-basis: 78%; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { flex-basis: 100%; } }
   @media (min-width: 861px) { body.hotel-page .ht-card .ht-actions { flex-wrap: nowrap; } body.hotel-page .ht-card .ht-actions a.ht-details { font-size: 0.86rem; white-space: nowrap; } body.hotel-page .ht-card .trip-btn, body.hotel-page .ht-card .ht-book-btn { padding: 0 11px; font-size: 0.8rem; white-space: nowrap; } body.hotel-page .ht-list:not(:has(> li:nth-child(6):last-child)):not(:has(> li:nth-child(9):last-child)):not(:has(> li:nth-child(3):last-child)) .trip-btn svg { display: none; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details span { display: none; } }
+  /* 2026-11-28 fixes: the happy-hour box never shows a sliver of a third line (the clamp's bottom padding is a border now), and
+     View details sits beside Add to trip on every screen (never stacked). A bookable card shows Book now + Add to trip instead. */
+  body.hotel-page .ht-card .ht-hh { padding: 6px 10px 0; border-bottom: 6px solid #fff4df; }
+  body.hotel-page .ht-card .ht-actions { flex-wrap: nowrap; gap: 8px; }
+  body.hotel-page .ht-card .ht-actions a.ht-details { flex: 0 1 auto; min-width: 0; font-size: 0.86rem; white-space: nowrap; }
+  body.hotel-page .ht-card .trip-btn, body.hotel-page .ht-card .ht-book-btn { flex: 0 0 auto; padding: 0 11px; font-size: 0.8rem; white-space: nowrap; }
+  body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { display: none; }
+  body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions > * { flex: 1 1 0; justify-content: center; }
+  @media (max-width: 640px) { body.hotel-page .ht-card .trip-btn svg { display: none; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { flex-basis: auto; } }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
