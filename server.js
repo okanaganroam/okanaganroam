@@ -3167,13 +3167,19 @@ const EVENT_MAX_CATEGORIES = 3;
 const EVENT_CREATE_FIELDS = [
   'name', 'slug', 'region', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
   'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
-  'recurrence_rule', 'price_kind', 'price_text', 'categories', 'occurrences',
+  'recurrence_rule', 'price_kind', 'price_text', 'categories', 'occurrences', 'image_urls',
 ];
 const EVENT_UPDATE_FIELDS = [
   'name', 'description', 'website', 'image_url', 'type', 'status', 'event_confidence',
   'source_type', 'source_name', 'source_url', 'source_checked_at', 'venue_id', 'venue_name_text', 'valley_wide',
-  'recurrence_rule', 'price_kind', 'price_text',
+  'recurrence_rule', 'price_kind', 'price_text', 'image_urls',
 ];
+// Several photos per event (2026-11-20): image_urls is the event's whole ordered photo list, main photo first, as
+// site paths under /images/ (no outside links). Writing it sets image_url to the first and events.images_json to the
+// rest; image_url alone still changes just the main photo. The columns an update can write:
+const EVENT_MAX_IMAGES = 8;
+const EVENT_LOCAL_IMAGE_PATTERN = /^\/images\/(?:[\w-]+\/)*[\w.-]+\.(?:jpe?g|webp|png)$/i;
+const EVENT_UPDATE_COLUMNS = [...EVENT_UPDATE_FIELDS.filter((f) => f !== 'image_urls'), 'images_json'];
 const EVENT_OCCURRENCE_FIELDS = ['start_date', 'end_date', 'start_time', 'end_time', 'ends_next_day', 'all_day', 'status', 'label', 'source_ref'];
 const EVENT_TYPES = ['sporting', 'festival', 'concert']; // existing EVENT_SCHEMA_TYPE_MAP keys
 const EVENT_PRICE_KINDS = ['free', 'donation', 'paid'];
@@ -3348,6 +3354,13 @@ function validateEventScalars(data, { partial = false } = {}) {
     if (has(f) && !isNullish(data[f]) && typeof data[f] !== 'string') return eventFail(`${f}_invalid`, `${f} must be a string or null`);
   }
   if (has('venue_id') && !isNullish(data.venue_id) && !(Number.isInteger(data.venue_id) && data.venue_id > 0)) return eventFail('venue_id_invalid', 'venue_id must be a positive integer or null');
+  if (has('image_urls')) {
+    const list = data.image_urls;
+    if (!Array.isArray(list) || list.some((p) => typeof p !== 'string' || !EVENT_LOCAL_IMAGE_PATTERN.test(p))) return eventFail('image_urls_invalid', 'image_urls must be an array of site photo paths under /images/ (.jpg, .webp or .png)');
+    if (list.length > EVENT_MAX_IMAGES) return eventFail('image_urls_too_many', `at most ${EVENT_MAX_IMAGES} photos per event`);
+    if (new Set(list).size !== list.length) return eventFail('image_urls_duplicate', 'each photo may appear once');
+    if (has('image_url') && (isNullish(data.image_url) ? null : data.image_url) !== (list[0] || null)) return eventFail('image_urls_conflict', 'send image_urls or image_url, not both (image_urls[0] is the main photo)');
+  }
   if (has('price_kind') && !isNullish(data.price_kind) && !EVENT_PRICE_KINDS.includes(data.price_kind)) return eventFail('price_kind_invalid', `price_kind must be null or one of ${EVENT_PRICE_KINDS.join('|')}`);
   if (has('price_text') && !isNullish(data.price_text) && !(typeof data.price_text === 'string' && data.price_text.trim() && data.price_text.length <= 80)) return eventFail('price_text_invalid', 'price_text must be a string of 1-80 characters or null');
   return null;
@@ -3456,8 +3469,22 @@ function rowToEventFull(row) {
     ...rowToEvent(row),
     status: row.status, event_confidence: row.event_confidence, source_type: row.source_type, source_name: row.source_name,
     source_url: row.source_url, source_checked_at: row.source_checked_at, venue_name_text: row.venue_name_text,
-    valley_wide: row.valley_wide,
+    valley_wide: row.valley_wide, images_json: row.images_json || null, images: eventImageList(row),
   };
+}
+// An event's photos in order (2026-11-20): the main one (image_url) first, then images_json's, no repeats.
+function eventImageList(row) {
+  const out = [];
+  const add = (p) => { const v = typeof p === 'string' ? p.trim() : ''; if (v && !out.includes(v)) out.push(v); };
+  add(row && row.image_url);
+  let more = [];
+  try { more = JSON.parse((row && row.images_json) || '[]'); } catch (err) { more = []; }
+  if (Array.isArray(more)) more.forEach(add);
+  return out;
+}
+// image_urls -> the stored columns: image_url = the first photo, images_json = the rest (null when none).
+function eventImageColumns(list) {
+  return { image_url: list[0] || null, images_json: list.length > 1 ? JSON.stringify(list.slice(1)) : null };
 }
 function getEventById(id) {
   const row = db.prepare('SELECT * FROM events WHERE id = ?').get(id);
@@ -3662,6 +3689,7 @@ function createEvent(data, meta) {
   input.occurrences = utcOccs.list;
   const scalarErr = validateEventScalars(input);
   if (scalarErr) return scalarErr;
+  if (Array.isArray(input.image_urls)) input.image_url = input.image_urls[0] || null; // the first photo is the main one
   const venueErr = validateEventVenue(input);
   if (venueErr) return venueErr;
   const catErr = validateEventCategories(input.categories);
@@ -3705,8 +3733,8 @@ function createEvent(data, meta) {
     txOpen = true;
     const info = db.prepare(`
       INSERT INTO events (name, slug, region, description, start_datetime, end_datetime, recurrence_rule, venue_id, website, image_url, type,
-        status, event_confidence, source_type, source_name, source_url, source_checked_at, venue_name_text, valley_wide, price_kind, price_text)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        status, event_confidence, source_type, source_name, source_url, source_checked_at, venue_name_text, valley_wide, price_kind, price_text, images_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       input.name.trim(), slug, input.region, optionalString(input.description), firstDate, firstDate,
       optionalString(input.recurrence_rule), isNullish(input.venue_id) ? null : input.venue_id,
       optionalString(input.website), optionalString(input.image_url), isNullish(input.type) ? null : input.type,
@@ -3714,6 +3742,7 @@ function createEvent(data, meta) {
       isNullish(input.source_checked_at) ? null : input.source_checked_at,
       optionalString(input.venue_name_text) || null, input.valley_wide,
       isNullish(input.price_kind) ? null : input.price_kind, optionalString(input.price_text) || null,
+      Array.isArray(input.image_urls) ? eventImageColumns(input.image_urls).images_json : null,
     );
     const eventId = Number(info.lastInsertRowid);
     logEventChange(eventId, null, 'create', null, `${input.region}/${slug}`, logMeta);
@@ -3753,6 +3782,10 @@ function updateEvent(id, data, meta) {
   if (unexpected.length) return eventFail(['region', 'slug'].some((k) => unexpected.includes(k)) ? `${unexpected.find((k) => k === 'region' || k === 'slug')}_immutable` : 'unexpected_field', unexpected.join(', '));
   const scalarErr = validateEventScalars(data, { partial: true });
   if (scalarErr) return scalarErr;
+  if (Object.prototype.hasOwnProperty.call(data, 'image_urls')) {
+    const { image_urls: list, ...rest } = data;
+    data = { ...rest, ...eventImageColumns(list) };
+  }
   const merged = { ...existing, ...data };
   if (Object.prototype.hasOwnProperty.call(data, 'venue_id') || Object.prototype.hasOwnProperty.call(data, 'venue_name_text') || Object.prototype.hasOwnProperty.call(data, 'valley_wide')) {
     const venueErr = validateEventVenue(merged);
@@ -3761,7 +3794,7 @@ function updateEvent(id, data, meta) {
   if (data.status === 'scheduled' && existing.status !== 'scheduled' && countScheduledOccurrences(id) === 0) {
     return eventFail('no_scheduled_occurrence', 'cannot publish an event with no scheduled occurrence');
   }
-  const changed = EVENT_UPDATE_FIELDS.filter((f) => Object.prototype.hasOwnProperty.call(data, f) && (isNullish(data[f]) ? null : data[f]) !== existing[f]);
+  const changed = EVENT_UPDATE_COLUMNS.filter((f) => Object.prototype.hasOwnProperty.call(data, f) && (isNullish(data[f]) ? null : data[f]) !== existing[f]);
   if (!changed.length) return { ok: true, event: getEventById(id), changed: [] };
   const logMeta = { ...meta, source: meta.source || existing.source_name, confidence: merged.event_confidence };
   let txOpen = false;
@@ -4185,6 +4218,7 @@ function whatsOnPublicEventDetail(event, now = new Date()) {
   return {
     id: event.id, name: event.name, slug: event.slug, region: event.region, valleyWide: event.valley_wide === 1,
     categories: getEventCategoryKeys(event.id), description: event.description || '', image: event.image_url || null,
+    images: eventImageList(event),
     website: event.website || null, recurrence: event.recurrence_rule || null, status: event.status,
     venueName: venue ? venue.name : (event.venue_name_text || null),
     attribution: EVENT_OFFICIAL_SOURCE_TYPES.includes(event.source_type) ? null : event.source_name,
@@ -47416,6 +47450,9 @@ function frenchTwinHtml(html, enPath, search = '') {
   // Tour test 7: day lengths and the full-day / multi-day words (« 1 à 5 jours », « Journée complète », « Plusieurs jours »).
   html = html.replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)(?:(\d+(?:\.\d+)?) (hr|min)\u2013)?(\d+)(?:\u2013(\d+))? days?(<\/span>)/g, (m, a, n0, u0, d1, d2, e) => `${a}${n0 ? `${n0.replace('.', ',')} ${u0 === 'hr' ? 'h' : 'min'} \u00e0 ${d1} jour${Number(d1) > 1 ? 's' : ''}` : d2 ? `${d1} \u00e0 ${d2} jours` : `${d1} jour${Number(d1) > 1 ? 's' : ''}`}${e}`)
     .replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)Full day(<\/span>)/g, '$1Journ\u00e9e compl\u00e8te$2').replace(/(<span class="chip chip-feat">(?:<svg[\s\S]{0,1200}?<\/svg>)?)Multi-day(<\/span>)/g, '$1Plusieurs jours$2');
+  // Several photos per event (2026-11-20): the event photo row's labels in French.
+  html = html.replace(/(<div class="event-gallery-track"[^>]*aria-label=")Event photos(")/g, '$1Photos de l\u2019\u00e9v\u00e9nement$2')
+    .replace(/(<div class="event-gallery-slide"[^>]*aria-label=")Photo (\d+) of (\d+)(")/g, '$1Photo $2 sur $3$4');
   const frPath = frTwinPath(enPath);
   const frEvent = frEventPageForPath(enPath);
   if (frEvent) html = frEventHead(html, frEvent);
@@ -50464,6 +50501,16 @@ function eventImageUrl(event, categories) {
   const p = eventImagePath(event, categories);
   return /^https?:\/\//.test(p) ? p : `https://okanaganroam.com${p}`;
 }
+// Several photos per event (2026-11-20): the Event schema's image lists the main picture, then the event's other
+// photos that are on this site, as absolute URLs. Only when the main picture is the event's own photo.
+function eventGalleryExtraPhotos(event) {
+  return eventImageList(event).slice(1).filter((p) => p !== event.image_url && EVENT_LOCAL_IMAGE_PATTERN.test(p) && fs.existsSync(uploadedPhotoFilePath(p) || path.join(__dirname, 'public', p)));
+}
+function eventSchemaImages(event, categories) {
+  const main = eventImageUrl(event, categories);
+  if (!event.image_url || eventImagePath(event, categories) !== event.image_url) return [main];
+  return [main, ...eventGalleryExtraPhotos(event).map((p) => `https://okanaganroam.com${p}`)].filter((u, i, a) => a.indexOf(u) === i);
+}
 // Event venue addresses (2026-10-19, site review pass 5): 634 event pages named their place ("Creekside Theatre",
 // "Vernon and District Performing Arts Centre") with only a town, so Google saw no street address. The busiest
 // event venues are in data/event-venue-addresses.json (each with its other spellings); an event whose place matches
@@ -50725,7 +50772,7 @@ function eventJsonLd(event, occurrences, categories, hostVenue, canonical, today
     eventAttendanceMode: 'https://schema.org/OfflineEventAttendanceMode',
     eventStatus: 'https://schema.org/EventScheduled',
     url: canonical,
-    image: [eventImageUrl(event, categories)],
+    image: eventSchemaImages(event, categories),
     location,
     organizer,
     offers,
@@ -51056,6 +51103,38 @@ function eventHeroImage(full, categories) {
   const big = small.replace(/-800\.jpg$/, '.jpg');
   return { small, big: big !== small && fs.existsSync(path.join(__dirname, 'public', big)) ? big : small };
 }
+// The photo row's counter ("2 / 3") follows the scroll; arrow keys on the focused row move one photo.
+const EVENT_GALLERY_SCRIPT = `<script>
+(function(){
+  var rows = document.querySelectorAll('[data-event-gallery]');
+  Array.prototype.forEach.call(rows, function(row){
+    var track = row.querySelector('.event-gallery-track'), count = row.querySelector('.event-gallery-count');
+    if (!track) return;
+    var n = track.children.length;
+    function at(){ return Math.max(0, Math.min(n - 1, Math.round(track.scrollLeft / (track.clientWidth || 1)))); }
+    track.addEventListener('scroll', function(){ if (count) count.textContent = (at() + 1) + ' / ' + n; }, { passive: true });
+    track.addEventListener('keydown', function(e){
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      e.preventDefault();
+      var k = Math.max(0, Math.min(n - 1, at() + (e.key === 'ArrowRight' ? 1 : -1)));
+      track.scrollTo({ left: k * track.clientWidth });
+    });
+  });
+})();
+</script>`;
+// A later photo in the event page's photo row (2026-11-20): lazy, with the -800-w480 / -800 / full-size copies that
+// exist beside it (the event photos' naming), sized like the hero.
+function eventGalleryImgHtml(p, name) {
+  const set = [];
+  if (/-800\.jpg$/.test(p)) {
+    const small = p.replace(/\.jpg$/, '-w480.jpg');
+    const big = p.replace(/-800\.jpg$/, '.jpg');
+    if (fs.existsSync(path.join(__dirname, 'public', small))) set.push(`${escapeHtml(small)} 480w`);
+    set.push(`${escapeHtml(p)} 800w`);
+    if (fs.existsSync(path.join(__dirname, 'public', big))) set.push(`${escapeHtml(big)} 1600w`);
+  }
+  return `<img src="${escapeHtml(p)}"${imgDimsAttr(p)}${set.length > 1 ? ` srcset="${set.join(', ')}" sizes="${EVENT_HERO_SIZES}"` : ''} alt="${escapeHtml(name)}" loading="lazy" decoding="async">`;
+}
 // iCalendar for an event's upcoming dates (up to 20), times in Okanagan local time (fixed UTC-7, round 7).
 function icsEscape(t) { return String(t || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/([,;])/g, '\\$1'); }
 // Calendar times (2026-10-19, site review pass 5): one occurrence as calendar start and end, local Okanagan time.
@@ -51248,7 +51327,15 @@ ${pastOccs.map(dateItem).join('\n')}
   // Speed (round 12, 2026-10-20): on a phone the photo is a 160px-tall strip, so the 800px copy is already about 2.3x
   // its width; a 2x or 3x phone asks for 260px (the 800px copy) instead of taking the 1600px one (258 KB), as the
   // venue heroes do. Tablets and computers keep their sizes.
-  const imageHtml = `<div class="event-hero"><img src="${escapeHtml(hero.big)}"${imgDimsAttr(hero.big)}${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="${EVENT_HERO_SIZES}"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
+  const heroImgHtml = `<img src="${escapeHtml(hero.big)}"${imgDimsAttr(hero.big)}${hero.big !== hero.small ? ` srcset="${escapeHtml(hero.small)} 800w, ${escapeHtml(hero.big)} 1600w" sizes="${EVENT_HERO_SIZES}"` : ''} alt="${ownImage ? escapeHtml(full.name) : ''}" fetchpriority="high">`;
+  // Several photos per event (2026-11-20): an event with more of its own photos shows them in a row to swipe (scroll
+  // snap), the first exactly as the single hero, the rest loaded lazily. One photo keeps the old markup.
+  const extraPhotos = ownImage && /^\/(?!\/)/.test(full.image_url) ? eventGalleryExtraPhotos(full) : [];
+  const photoCount = extraPhotos.length + 1;
+  const slideHtml = (inner, i) => `<div class="event-gallery-slide" role="group" aria-label="Photo ${i + 1} of ${photoCount}">${inner}</div>`;
+  const imageHtml = extraPhotos.length
+    ? `<div class="event-hero event-gallery" data-event-gallery><div class="event-gallery-track" role="region" aria-label="Event photos" tabindex="0">${slideHtml(heroImgHtml, 0)}${extraPhotos.map((p, i) => slideHtml(eventGalleryImgHtml(p, full.name), i + 1)).join('')}</div><span class="event-gallery-count" aria-hidden="true">1 / ${photoCount}</span></div>`
+    : `<div class="event-hero">${heroImgHtml}${ownImage ? '' : '<span class="event-hero-example">Example photo</span>'}</div>`;
   const next = eventNextOccurrence(occurrences, todayStr);
   const statusText = expired ? null : eventStatusText(next, todayStr, isSeries);
   // The calendar-import sentence becomes its short summary (the What's On card's).
@@ -51353,6 +51440,12 @@ ${renderAnalyticsHeadHtml('event')}
   /* 2026-10-14: photo, status line, buttons and a details sidebar. */
   .event-hero { position: relative; width: 100%; height: clamp(170px, 26vw, 340px); margin: 0 0 18px; border-radius: 16px; overflow: hidden; background: #2A6B67; }
   .event-hero img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .event-gallery-track { display: flex; height: 100%; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .event-gallery-track::-webkit-scrollbar { display: none; }
+  .event-gallery-track:focus-visible { outline: 3px solid #fff; outline-offset: -3px; }
+  .event-gallery-slide { flex: 0 0 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+  .event-gallery-count { position: absolute; right: 14px; bottom: 12px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.75rem; font-weight: 700; color: #fff; background: rgba(16,27,36,0.55); padding: 3px 9px; border-radius: 999px; pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) { .event-gallery-track { scroll-behavior: auto; } }
   .event-hero-example { position: absolute; right: 14px; bottom: 12px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-size: 0.7rem; font-weight: 700; color: rgba(255,255,255,0.88); background: rgba(16,27,36,0.45); padding: 3px 8px; border-radius: 999px; }
   .event-status { display: inline-flex; align-items: center; gap: 7px; margin: 0 0 12px; font-family: 'Nunito', 'Nunito Fallback', sans-serif; font-weight: 800; font-size: 0.98rem; color: var(--teal, #2A6B67); }
   .event-status::before { content: ""; width: 9px; height: 9px; border-radius: 999px; background: currentColor; }
@@ -51423,7 +51516,7 @@ ${renderGolfHeaderHtml()}
     { name: regionLabel, href: `/${full.region}` },
     { name: full.name },
   ])}
-  ${imageHtml}
+  ${imageHtml}${extraPhotos.length ? EVENT_GALLERY_SCRIPT : ''}
   <div class="event-layout">
   <div class="event-main">
   <h1>${escapeHtml(full.name)}</h1>
@@ -87401,6 +87494,9 @@ module.exports = {
   recomputeEventSpan,
   getEventById,
   getEventCategoryKeys,
+  eventImageList,
+  eventSchemaImages,
+  eventImageUrl,
   listEventOccurrences,
   countScheduledOccurrences,
   listRelatedEventsInRegion,
