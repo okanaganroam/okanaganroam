@@ -36766,6 +36766,36 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card .ht-tags span { padding: 3px 9px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: #3a4b5c; font-size: 0.72rem; font-weight: 700; }
   body.hotel-page .ht-card .ht-actions { margin: 10px 14px 14px; }
   body.hotel-page .ht-card .ht-book-btn { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: var(--ref-navy, #1B2B3A); }
+  /* Page polish (2026-11-28, Dayton: "sharp, crisp and professional, easy to use"): events and day-trip cards match the place cards,
+     tidy rows on wide screens, clearer section headings and buttons. CSS only. */
+  body.hotel-page .ht-group { margin-top: 34px; }
+  body.hotel-page .ht-group > h2, body.hotel-page h2[id^="ht-"] { font-size: clamp(1.3rem, 4.6vw, 1.6rem); letter-spacing: -0.01em; margin-bottom: 14px; }
+  body.hotel-page .ht-event, body.hotel-page .ht-trip { border: 0; border-radius: 20px; gap: 4px; padding: 0 0 14px; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 8px 24px rgba(27,43,58,0.10); }
+  body.hotel-page .ht-event img, body.hotel-page .ht-trip img { height: auto; aspect-ratio: 16 / 10; object-fit: cover; margin: 0 0 10px; background: #e8edf2; transition: transform .45s ease; }
+  @media (hover: hover) { body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: scale(1.05); } }
+  @media (prefers-reduced-motion: reduce) { body.hotel-page .ht-event img, body.hotel-page .ht-trip img { transition: none; } body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: none; } }
+  body.hotel-page .ht-event .ht-meta, body.hotel-page .ht-trip .ht-meta { padding: 0 14px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8A6A0F; opacity: 1; }
+  body.hotel-page .ht-event .ht-name, body.hotel-page .ht-trip .ht-name { padding: 0 14px; font-size: 1.06rem; line-height: 1.25; letter-spacing: -0.01em; }
+  body.hotel-page .ht-card .ht-tags { flex-wrap: nowrap; overflow: hidden; max-width: 100%; }
+  body.hotel-page .ht-card .ht-tags span { flex: none; white-space: nowrap; }
+  body.hotel-page .ht-card .trip-btn { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy, #1B2B3A); font-weight: 800; transition: background .15s ease, color .15s ease, border-color .15s ease; }
+  @media (hover: hover) { body.hotel-page .ht-card .trip-btn:hover { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: #fff; } }
+  body.hotel-page .ht-card .trip-btn[aria-pressed="true"] { background: #e6f4ea; border-color: #22a04b; color: #1e6b34; }
+  body.hotel-page .ht-more a.ht-pill, body.hotel-page .ht-events-more summary { border: 1.5px solid rgba(27,43,58,0.22); box-shadow: 0 1px 2px rgba(27,43,58,0.05); transition: background .15s ease, color .15s ease, border-color .15s ease; }
+  body.hotel-page .ht-more a.ht-pill::after { content: '\\2192'; margin-left: 8px; transition: transform .15s ease; }
+  @media (hover: hover) { body.hotel-page .ht-more a.ht-pill:hover, body.hotel-page .ht-events-more summary:hover { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: #fff; } body.hotel-page .ht-more a.ht-pill:hover::after { transform: translateX(3px); } }
+  body.hotel-page .ht-filters button { min-height: 42px; padding: 0 16px; border-width: 1.5px; border-color: rgba(27,43,58,0.22); }
+  body.hotel-page .ht-filters button[aria-pressed="true"] { border-color: var(--ref-navy, #1B2B3A); box-shadow: 0 4px 12px rgba(27,43,58,0.22); }
+  body.hotel-page .ht-guides a { border: 0; border-radius: 16px; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 6px 18px rgba(27,43,58,0.08); }
+  @media (min-width: 861px) {
+    /* No orphan row: six or nine cards sit three across; a lone ninth card of a 4-across row never happens. */
+    body.hotel-page .ht-list:has(> li:nth-child(6):last-child), body.hotel-page .ht-list:has(> li:nth-child(9):last-child), body.hotel-page .ht-list:has(> li:nth-child(3):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.hotel-page .ht-list { gap: 16px; }
+    body.hotel-page .ht-events, body.hotel-page .ht-trips { gap: 16px; }
+    body.hotel-page .ht-guides { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  }
+  body.hotel-page .ht-events-more summary::after { content: '\\25BE'; margin-left: 8px; font-size: 0.9em; transition: transform .15s ease; }
+  body.hotel-page .ht-events-more[open] summary::after { transform: rotate(180deg); }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
