@@ -36502,6 +36502,17 @@ function hotelHoursLine(v, status, now) {
   } catch (e) { /* fall through */ }
   return { text: hotelHoursNote(v.id) || (v.type === 'outdoor' ? 'Open access; no set hours' : 'Hours on their page'), open: false };
 }
+// "Opens Dec 3 · 11 AM–9 PM": the opening date plus the place's own hours that weekday (2026-11-27, Dayton: every card shows hours or when it opens, with its hours).
+function hotelOpensLabel(v, dateStr) {
+  let lbl = `Opens ${formatLocalDateShort(dateStr, { weekday: false })}`;
+  try {
+    const dk = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${dateStr}T12:00:00Z`).getUTCDay()];
+    const iv = v && v.hours ? (typeof v.hours === 'string' ? JSON.parse(v.hours) : v.hours)[dk] : null;
+    const fmt = (t) => { const [h, m] = t.split(':').map(Number); const hh = h % 12 || 12; return `${hh}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 || h === 24 ? 'AM' : 'PM'}`; };
+    if (iv && iv[0] && iv[0][0] && iv[0][1] && iv[0][1] !== '23:59') lbl += ` \u00b7 ${fmt(iv[0][0])}\u2013${fmt(iv[0][1])}`;
+  } catch (e) { /* label stays as the date only */ }
+  return lbl;
+}
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
@@ -36520,8 +36531,14 @@ function renderHotelPage(hotel, now = new Date()) {
     // closed for the season with no date yet opens with the hill: "Opens for the ski season" (hotel on that hill only).
     const row = st.kind === 'closed' ? seasonRows.get(id) : null;
     if (!row || notOperating.has(id)) continue;
-    if (row.reopens_date && row.reopens_date >= today0 && row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)) opensSoon.set(id, `Opens ${formatLocalDateShort(row.reopens_date, { weekday: false })}`);
-    else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) opensSoon.set(id, 'Opens for the ski season');
+    if (row.reopens_date && row.reopens_date >= today0 && row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)) opensSoon.set(id, hotelOpensLabel(venues.find((x) => x.id === id), row.reopens_date));
+    else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) {
+      const hillOpens = SKI_RESORT_SEASON[hotel.region] && SKI_RESORT_SEASON[hotel.region].opens;
+      const hv = venues.find((x) => x.id === id);
+      let lbl = 'Opens for the ski season';
+      if (hillOpens && hillOpens >= today0) lbl = hotelOpensLabel(hv, hillOpens);
+      opensSoon.set(id, lbl);
+    }
   }
   const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
   const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon, now);

@@ -99,7 +99,7 @@ test('hotel groups (2026-10-20): a place closed only until soon is listed after 
   const groups = app.hotelPageGroups(HOTEL, venues, { openIds: new Set([2]), byId: new Map() }, closed, soon);
   assert.deepEqual(groups[0].items.map((x) => x.v.id), [2, 1], 'open place first, then the one opening soon; the closed pub stays out');
   const src = fs.readFileSync(path.join(__dirname, '..', 'server.js'), 'utf8');
-  assert.ok(src.includes("opensSoon.set(id, 'Opens for the ski season')"), 'ski-hill places with no date yet open with the hill');
+  assert.ok(src.includes("let lbl = 'Opens for the ski season'"), 'ski-hill places with no date yet open with the hill');
   assert.ok(src.includes('row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)'));
   assert.ok(src.includes('<span class="ht-soon">'));
 });
