@@ -21343,7 +21343,7 @@ const FOOTER_REGION_GROUPS = [
 // argument and still gets the full footer, which home-simple.js turns into its own short one.
 // The town, ski-resort and Kelowna landing pages carry their own one-line footer; swap it for the short homepage-style one (2026-11-28, Dayton).
 function withShortFooter(html) {
-  return String(html).replace(/<footer class="bw-footer">[\s\S]*?<\/footer>/, () => renderHomeFooterHTML(true));
+  return require('./town-polish') + String(html).replace(/<footer class="bw-footer">[\s\S]*?<\/footer>/, () => renderHomeFooterHTML(true));
 }
 function renderHomeFooterHTML(fromBrowse) {
   const full = renderHomeFooterFullHTML(fromBrowse);
