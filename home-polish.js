@@ -288,6 +288,24 @@ const css = `
 #homeSimple .trip-banner p{font-size:15px}
 }
 
+/* ---- guide tiles: icon, name, number of places ---- */
+#homeSimple .guide-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#homeSimple .guide-chip{display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;align-items:center;align-content:center;min-height:68px;padding:12px 14px;border:0;border-radius:18px;background:#fff;box-shadow:0 1px 2px rgba(27,43,58,.06),0 6px 18px rgba(27,43,58,.08);font-size:15px;font-weight:800;line-height:1.2;text-align:left;transition:transform .2s ${EASE},box-shadow .2s ${EASE}}
+#homeSimple .guide-chip .gi{grid-row:1 / span 2;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;font-style:normal;font-size:22px;font-family:system-ui,sans-serif;background:#FBF1D3;transition:transform .25s ${EASE}}
+#homeSimple .guide-chip:nth-child(4n+2) .gi{background:#E3F1EE}
+#homeSimple .guide-chip:nth-child(4n+3) .gi{background:#FBE7DF}
+#homeSimple .guide-chip:nth-child(4n+4) .gi{background:#E6ECF7}
+#homeSimple .guide-chip .gt{font-weight:800;align-self:end;overflow-wrap:anywhere}
+#homeSimple .guide-chip span{grid-column:2;align-self:start;margin-top:2px;font-size:12px;font-weight:700;color:#6B7A88}
+#homeSimple .guide-chip span:after{content:' places'}
+html[lang="fr"] #homeSimple .guide-chip span:after{content:' lieux'}
+#homeSimple .guide-chip:hover{background:#fff;color:inherit;transform:translateY(-3px);box-shadow:0 2px 4px rgba(27,43,58,.1),0 12px 26px rgba(27,43,58,.14)}
+#homeSimple .guide-chip:hover span{color:#6B7A88}
+#homeSimple .guide-chip:hover .gi{transform:scale(1.1) rotate(-6deg)}
+#homeSimple .guide-panel{background:transparent;box-shadow:none;padding:6px 0 0}
+@media(max-width:1000px){#homeSimple .guide-chips{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:700px){#homeSimple .guide-chips{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#homeSimple .guide-chip{grid-template-columns:38px minmax(0,1fr);column-gap:10px;padding:10px 11px;min-height:62px;font-size:13.5px;border-radius:16px}#homeSimple .guide-chip .gi{width:38px;height:38px;font-size:19px;border-radius:12px}#homeSimple .guide-panel{padding:4px 0 0}}
+
 /* ---- people who ask for less motion get none ---- */
 @media(prefers-reduced-motion:reduce){
 #homeSimple *,#homeSimple *:before,#homeSimple *:after{animation:none!important;transition:none!important}
@@ -303,6 +321,9 @@ const viewTransition = `@view-transition{navigation:auto}
 
 // The guide index (server.js renderGuideFooterHTML: one line of links per town) as a tab per town with a chip per
 // guide. Every town and guide link stays in the page; without scripting all the towns are listed one after another.
+// Guide tiles (2026-11-28, Dayton: "more tempting to click", not a wall of text): each guide is a tile with its own icon,
+// its name and how many places it has.
+const GUIDE_ICONS = { kid_friendly: '\u{1F388}', great_groups: '\u{1F942}', gluten_free: '\u{1F33E}', patio: '\u26F1\uFE0F', vegetarian: '\u{1F957}', vegan: '\u{1F331}', dog_friendly: '\u{1F436}', open_late: '\u{1F319}', happy_hour: '\u{1F379}', lake_view: '\u{1F30A}', free_entry: '\u{1F39F}\uFE0F', open_early: '\u{1F305}', live_music: '\u{1F3B8}', nonalcoholic: '\u{1F9C3}', sports_tv: '\u{1F4FA}', arts_culture: '\u{1F3A8}' };
 function guidesSection(indexHtml, bi) {
   const towns = [...String(indexHtml || '').matchAll(/<div class="og-guide-region"><strong><a href="([^"]+)">([^<]+)<\/a>:<\/strong>([\s\S]*?)<\/div>/g)]
     .map((m) => ({ href: m[1], name: m[2], links: [...m[3].matchAll(/<a href="([^"]+)">([^<]*?)(?: \((\d+)\))?<\/a>/g)].map((a) => ({ href: a[1], label: a[2], count: a[3] })) }))
@@ -310,7 +331,7 @@ function guidesSection(indexHtml, bi) {
   if (!towns.length) return '';
   const id = (t) => `guides-${t.href.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '')}`;
   const tabs = towns.map((t, i) => `<button type="button" class="guide-tab" role="tab" id="${id(t)}-tab" aria-controls="${id(t)}" aria-selected="${i === 0 ? 'true' : 'false'}"${i === 0 ? '' : ' tabindex="-1"'}>${t.name}</button>`).join('');
-  const panels = towns.map((t, i) => `<div class="guide-panel${i === 0 ? ' is-active' : ''}" role="tabpanel" id="${id(t)}" aria-labelledby="${id(t)}-tab"><h3><a href="${t.href}">${t.name}</a></h3><div class="guide-chips">${t.links.map((l) => `<a class="guide-chip" href="${l.href}">${l.label}${l.count ? ` <span>${l.count}</span>` : ''}</a>`).join('')}</div></div>`).join('');
+  const panels = towns.map((t, i) => `<div class="guide-panel${i === 0 ? ' is-active' : ''}" role="tabpanel" id="${id(t)}" aria-labelledby="${id(t)}-tab"><h3><a href="${t.href}">${t.name}</a></h3><div class="guide-chips">${t.links.map((l) => `<a class="guide-chip" href="${l.href}"><i class="gi" aria-hidden="true">${GUIDE_ICONS[String(l.href).split('/').pop()] || '\u2728'}</i><b class="gt">${l.label}</b>${l.count ? ` <span>${l.count}</span>` : ''}</a>`).join('')}</div></div>`).join('');
   return `<section class="guides" id="og-guides"><div class="heading"><div><div class="mini-label">${bi('Every town. Every kind of day.', 'Chaque ville. Chaque envie.')}</div><h2>${bi('Browse by guide', 'Explorer par guide')}</h2></div></div><div class="guide-tabs" role="tablist" aria-label="Towns">${tabs}</div>${panels}</section>`;
 }
 const guidesScript = `<script id="home-guide-tabs">(function(){var s=document.getElementById('og-guides');if(!s)return;var tabs=[].slice.call(s.querySelectorAll('.guide-tab'));if(!tabs.length)return;s.classList.add('js-tabs');function pick(t,focus){tabs.forEach(function(x){var on=x===t;x.setAttribute('aria-selected',on?'true':'false');x.tabIndex=on?0:-1;var p=document.getElementById(x.getAttribute('aria-controls'));if(p)p.classList.toggle('is-active',on)});if(focus){t.focus();if(t.scrollIntoView)t.scrollIntoView({block:'nearest',inline:'nearest',behavior:'smooth'})}}s.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('.guide-tab');if(t)pick(t,false)});s.addEventListener('keydown',function(e){var i=tabs.indexOf(document.activeElement);if(i<0)return;var n=-1;if(e.key==='ArrowRight')n=(i+1)%tabs.length;else if(e.key==='ArrowLeft')n=(i-1+tabs.length)%tabs.length;else if(e.key==='Home')n=0;else if(e.key==='End')n=tabs.length-1;if(n>=0){e.preventDefault();pick(tabs[n],true)}})})();</script>`;
