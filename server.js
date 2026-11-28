@@ -36476,6 +36476,14 @@ function hotelGuideIcon(heading) {
 }
 // Every card says when the place is open or opens next (2026-11-27, Dayton): the live status when it has one, otherwise
 // read straight from the listed hours; a place with no hours says so and points to its own page.
+let hotelHoursNotesCache = null;
+function hotelHoursNote(id) {
+  if (!hotelHoursNotesCache) {
+    try { hotelHoursNotesCache = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'hotel-hours-notes.json'), 'utf8')); } catch (e) { hotelHoursNotesCache = {}; }
+  }
+  const n = hotelHoursNotesCache[String(id)];
+  return typeof n === 'string' && n.trim() ? n.trim() : '';
+}
 function hotelHoursLine(v, status, now) {
   if (status && status.state && status.text) return status.text;
   try {
@@ -36486,7 +36494,7 @@ function hotelHoursLine(v, status, now) {
       if (label && label.text && label.state !== 'unknown') return label.text;
     }
   } catch (e) { /* fall through */ }
-  return 'Hours on their page';
+  return hotelHoursNote(v.id) || 'Hours on their page';
 }
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
