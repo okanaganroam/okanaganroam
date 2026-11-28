@@ -36494,7 +36494,7 @@ function hotelHoursLine(v, status, now) {
       if (label && label.text && label.state !== 'unknown') return { text: label.text, open: label.state === 'open' };
     }
   } catch (e) { /* fall through */ }
-  return { text: hotelHoursNote(v.id) || 'Hours on their page', open: false };
+  return { text: hotelHoursNote(v.id) || (v.type === 'outdoor' ? 'Open access; no set hours' : 'Hours on their page'), open: false };
 }
 function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
