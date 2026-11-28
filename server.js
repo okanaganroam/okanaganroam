@@ -36567,7 +36567,10 @@ function renderHotelPage(hotel, now = new Date()) {
     const href = discoveryEventUrl(e);
     const label = upcomingEventDateLabel(e.nextDate, e.nextEndDate, now);
     let pic = '';
-    try { pic = eventImagePath({ ...e, image_url: e.image_url || e.image || null }, e.categories || []); } catch (err) { pic = ''; }
+    const own = e.image_url || e.image || null;
+    // An event's own photo (a file on this site) wins over the shared category photo (2026-11-27, Dayton: events cannot share one).
+    if (own && /^\/images\/events\/[A-Za-z0-9._-]+$/.test(String(own).split('?')[0])) pic = String(own);
+    else { try { pic = eventImagePath({ ...e, image_url: own }, e.categories || []); } catch (err) { pic = ''; } }
     return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
   };
   const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
