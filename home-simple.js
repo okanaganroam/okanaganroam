@@ -59,6 +59,7 @@ footer.site-footer-compact .logo span{color:#E3B341}
 footer.site-footer-compact p{font-size:13px;color:#ccd3d3;margin:10px 0 0}
 footer.site-footer-compact summary{font-weight:700;font-size:15px;cursor:pointer;padding:8px 0;list-style:none;color:#fff}
 footer.site-footer-compact summary::-webkit-details-marker{display:none}
+footer.site-footer-compact summary::after,footer.site-footer-compact details[open] summary::after{content:none}
 footer.site-footer-compact .home-footer-fold{border:0;padding:0}
 footer.site-footer-compact details a{display:block;font-size:14px;color:#d8dddd;padding:5px 0;text-decoration:none}
 footer.site-footer-compact details a:hover{color:#E3B341}
