@@ -36859,6 +36859,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { display: none; }
   body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions > * { flex: 1 1 0; justify-content: center; }
   @media (max-width: 640px) { body.hotel-page .ht-card .trip-btn svg { display: none; } body.hotel-page .ht-card:has(.ht-book-btn) .ht-actions a.ht-details { flex-basis: auto; } }
+  /* Narrow cards in the expanded "View all" grid on phones: the whole card opens the details, so only the button shows, full width. */
+  @media (max-width: 640px) { body.hotel-page .ht-list-more .ht-card .ht-actions a.ht-details { display: none; } body.hotel-page .ht-list-more .ht-card .ht-actions > * { flex: 1 1 0; justify-content: center; } }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
