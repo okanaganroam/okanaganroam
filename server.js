@@ -36510,6 +36510,7 @@ function hotelOpensLabel(v, dateStr) {
     const iv = v && v.hours ? (typeof v.hours === 'string' ? JSON.parse(v.hours) : v.hours)[dk] : null;
     const fmt = (t) => { const [h, m] = t.split(':').map(Number); const hh = h % 12 || 12; return `${hh}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 || h === 24 ? 'AM' : 'PM'}`; };
     if (iv && iv[0] && iv[0][0] && iv[0][1] && iv[0][1] !== '23:59') lbl += ` \u00b7 ${fmt(iv[0][0])}\u2013${fmt(iv[0][1])}`;
+    else { const nt = hotelHoursNote(v && v.id); if (nt && !/^(Temporarily closed|Closed)/i.test(nt)) lbl += ` \u00b7 ${nt}`; }
   } catch (e) { /* label stays as the date only */ }
   return lbl;
 }
@@ -36537,6 +36538,7 @@ function renderHotelPage(hotel, now = new Date()) {
       const hv = venues.find((x) => x.id === id);
       let lbl = 'Opens for the ski season';
       if (hillOpens && hillOpens >= today0) lbl = hotelOpensLabel(hv, hillOpens);
+      else { const nt = hotelHoursNote(id); if (nt) lbl += ` \u00b7 ${nt}`; }
       opensSoon.set(id, lbl);
     }
   }
