@@ -36776,7 +36776,8 @@ ${renderAnalyticsHeadHtml('hotel')}
   @media (prefers-reduced-motion: reduce) { body.hotel-page .ht-event img, body.hotel-page .ht-trip img { transition: none; } body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: none; } }
   body.hotel-page .ht-event .ht-meta, body.hotel-page .ht-trip .ht-meta { padding: 0 14px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8A6A0F; opacity: 1; }
   body.hotel-page .ht-event .ht-name, body.hotel-page .ht-trip .ht-name { padding: 0 14px; font-size: 1.06rem; line-height: 1.25; letter-spacing: -0.01em; }
-  body.hotel-page .ht-card .ht-tags { flex-wrap: nowrap; overflow: hidden; max-width: 100%; }
+  /* Badges are never cut mid-word (2026-11-28): they wrap, up to two rows; a badge that does not fit drops out whole. */
+  body.hotel-page .ht-card .ht-tags { flex-wrap: wrap; overflow: hidden; max-width: 100%; max-height: 58px; }
   body.hotel-page .ht-card .ht-tags span { flex: none; white-space: nowrap; }
   body.hotel-page .ht-card .trip-btn { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid rgba(27,43,58,0.22); background: #fff; color: var(--ref-navy, #1B2B3A); font-weight: 800; transition: background .15s ease, color .15s ease, border-color .15s ease; }
   @media (hover: hover) { body.hotel-page .ht-card .trip-btn:hover { background: var(--ref-navy, #1B2B3A); border-color: var(--ref-navy, #1B2B3A); color: #fff; } }
