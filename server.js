@@ -36729,7 +36729,9 @@ function renderHotelPage(hotel, now = new Date()) {
     const photo = venueThumbPhoto(v, photosUsed);
     const tripQuery = `${v.name}, ${town}, Okanagan Valley, BC`;
     const flags = hotelVenueFlags(v, open);
-    const tags = hotelVenueTags(v);
+    // Two badges, then "N more features" (2026-11-28, Dayton: more than two badges would make a long list). Same badges and labels as the listing cards.
+    const chipList = (cardBadgeChipsHtml(v).match(/<span class="chip[^"]*"[^>]*>.*?<\/span>/g) || []);
+    const tags = chipList.slice(0, 2).concat(chipList.length > 2 ? [`<span class="ht-tag-more">${chipList.length - 2} more feature${chipList.length - 2 === 1 ? '' : 's'}</span>`] : []);
     let hh = '';
     if (v.happy_hour) {
       const d = venueHappyHourDeals(v.id, now);
@@ -36738,7 +36740,7 @@ function renderHotelPage(hotel, now = new Date()) {
     const bk = bookable.get(v.id) || null;
     if (bk) anyBookable = true;
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${(() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}${hotelIsRental(hotel) ? escapeHtml(hotelIsSkiHill(hotel) ? ' from the village' : ' from downtown') : ''}</span>`; })()}</span><span class="ht-body"><span class="ht-kick">${escapeHtml(hotelCardKicker(v, typeLabel))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${hotelCardDesc(v) ? `<span class="ht-desc">${escapeHtml(hotelCardDesc(v))}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${(() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}${hotelIsRental(hotel) ? escapeHtml(hotelIsSkiHill(hotel) ? ' from the village' : ' from downtown') : ''}</span>`; })()}</span><span class="ht-body"><span class="ht-kick">${escapeHtml(hotelCardKicker(v, typeLabel))}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${hotelCardDesc(v) ? `<span class="ht-desc">${escapeHtml(hotelCardDesc(v))}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.join('')}</span>` : ''}</span></a>
       <div class="ht-actions"><a class="ht-details" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}" tabindex="-1" aria-hidden="true" data-ht-cta="details">View details <span>\u2192</span></a><button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>${bk ? `<a class="ht-book-btn" href="${escapeHtml(bk.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(bk.code)}" aria-label="${escapeHtml(`Book ${v.name} on Viator`)}">Book now <span aria-hidden="true">\u2197</span></a>` : ''}</div>
     </li>`;
   };
@@ -36942,7 +36944,7 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card .ht-open::before, body.hotel-page .ht-card .ht-soon::before { position: absolute; left: 0; top: 0.42em; width: 8px; height: 8px; margin: 0; transform: none; }
   body.hotel-page .ht-card .ht-open::before { box-shadow: 0 0 0 3px rgba(34,160,75,0.16); }
   body.hotel-page .ht-card .ht-hh { width: 100%; box-sizing: border-box; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; padding: 6px 10px; }
-  body.hotel-page .ht-card .ht-tags { flex-wrap: nowrap; max-height: none; min-height: 27px; gap: 6px; margin-top: 2px; }
+  body.hotel-page .ht-card .ht-tags { flex-wrap: wrap; max-height: none; min-height: 27px; gap: 6px; margin-top: 2px; }
   body.hotel-page .ht-card .ht-tags span[hidden] { display: none; }
   body.hotel-page .ht-card .ht-tags .ht-tag-more { background: #f1f4f8; border-color: transparent; color: #3a4b5c; font-weight: 800; }
   body.hotel-page .ht-card .ht-actions { margin: 12px 14px 14px; gap: 8px; flex-wrap: nowrap; }
@@ -36963,6 +36965,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-card .ht-desc { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; margin: 10px 0 0; font-size: 0.92rem; font-weight: 400; line-height: 1.45; color: #5b4f47; }
   body.hotel-page .ht-card .ht-tags { margin: 12px 0 0; }
   body.hotel-page .ht-card .ht-tags span { padding: 4px 11px; font-size: 0.76rem; color: var(--teal-deep, #1E4F4C); border-color: rgba(27,43,58,0.16); }
+  /* Two badges share one line, with "N more features" under them (2026-11-28). */
+  body.hotel-page .ht-card .ht-tags { gap: 5px; }
+  body.hotel-page .ht-card .ht-tags span { padding: 3px 8px; font-size: 0.72rem; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  body.hotel-page .ht-card .ht-tags span svg { width: 1em; height: 1em; flex: 0 0 auto; }
   body.hotel-page .ht-card .ht-actions { margin: 14px 16px 14px; padding-top: 12px; border-top: 1px solid rgba(27,43,58,0.1); gap: 8px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
   body.hotel-page .ht-card .ht-actions > * { flex: 0 0 auto; }
   body.hotel-page .ht-card .ht-actions a.ht-details { margin-right: auto; min-height: 40px; padding: 0; border: 0; background: none; display: inline-flex; align-items: center; gap: 6px; color: var(--ref-navy, #1B2B3A); font-weight: 800; font-size: 0.92rem; text-decoration: none; }
@@ -37108,15 +37114,6 @@ document.addEventListener('click', function(e){
 // badge that does not fit is hidden whole and counted in a small "+N" at the end, never cut.
 (function () {
   function fit() {
-    document.querySelectorAll('.ht-card .ht-tags').forEach(function (row) {
-      var more = row.querySelector('.ht-tag-more'); if (more) more.remove();
-      var tags = Array.prototype.slice.call(row.children); tags.forEach(function (t) { t.hidden = false; });
-      if (!row.clientWidth || row.scrollWidth <= row.clientWidth + 1) return;
-      more = document.createElement('span'); more.className = 'ht-tag-more'; row.appendChild(more);
-      var n = 0;
-      for (var i = tags.length - 1; i >= 1 && row.scrollWidth > row.clientWidth + 1; i--) { tags[i].hidden = true; n++; more.textContent = '+' + n; }
-      if (!n) more.remove();
-    });
     document.querySelectorAll('.ht-list').forEach(function (list) {
       var rows = {};
       Array.prototype.forEach.call(list.children, function (c) {
