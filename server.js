@@ -36518,6 +36518,8 @@ function renderHotelPage(hotel, now = new Date()) {
   const venues = db.prepare('SELECT * FROM venues WHERE redirect_to IS NULL AND type != \'stay\' AND slug IS NOT NULL AND latitude IS NOT NULL AND longitude IS NOT NULL').all().map(rowToVenue);
   const notOperating = advisoryNotOperatingIds();
   const closedIds = new Set(notOperating);
+  // Summer-only / seasonal places that are shut for the winter stay off the page in the ski months, whatever their note says.
+  if (hotelIsSkiMonth(now)) { try { for (const sid of JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'hotel-seasonal-closed.json'), 'utf8')).ids || []) closedIds.add(sid); } catch (e) { /* no list */ } }
   const today0 = todayLocal(now);
   const seasonRows = getSeasonRows(today0);
   const regionOf = new Map(venues.map((v) => [v.id, v.region]));

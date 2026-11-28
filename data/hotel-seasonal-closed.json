@@ -1,0 +1,13 @@
+{
+ "_note": "Venue ids that are closed for the winter (summer-only or seasonal). Hotel/rental guest pages leave them out in the ski months (Nov-Apr). Dayton, Nov 27 2026: never offer a summer tour in winter.",
+ "ids": [
+  837,
+  128,
+  1425,
+  731,
+  1828,
+  1840,
+  2169,
+  1845
+ ]
+}
