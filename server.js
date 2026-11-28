@@ -35974,6 +35974,25 @@ function hotelTitleLine(hotel) {
   const town = REGION_LABELS[hotel.region] || hotel.region;
   return hotelIsRental(hotel) ? `What's open in ${town} right now` : `Things to do ${hotelHeadline(hotel)}`;
 }
+// Where, when and how much on a guest-page event card, plus a short description (2026-11-28, Dayton: "a little more info on the
+// event cards"). Reads the event's own venue, its next occurrence's time and its price; any part that is missing is left out.
+function hotelEventInfoHtml(e) {
+  try {
+    const row = db.prepare('SELECT venue_id, venue_name_text FROM events WHERE id = ?').get(e.id) || {};
+    let place = row.venue_name_text || '';
+    if (!place && row.venue_id) { const vr = db.prepare('SELECT name FROM venues WHERE id = ?').get(row.venue_id); place = (vr && vr.name) || ''; }
+    let time = '';
+    if (e.nextDate) {
+      const o = db.prepare("SELECT start_time, end_time, all_day FROM event_occurrences WHERE event_id = ? AND status = 'scheduled' AND start_date <= ? AND end_date >= ? ORDER BY start_date LIMIT 1").get(e.id, e.nextDate, e.nextDate);
+      if (o && o.all_day !== 1 && o.start_time && o.start_time !== '00:00') time = formatLocalTime(o.start_time) + (o.end_time && o.end_time !== '00:00' ? `\u2013${formatLocalTime(o.end_time)}` : '');
+    }
+    const price = eventPriceLabel(e);
+    let desc = String(e.description || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (desc.length > 110) desc = desc.slice(0, 110).replace(/\s+\S*$/, '') + '\u2026';
+    const facts = [place && `<span class="ht-ev-fact">\ud83d\udccd ${escapeHtml(place)}</span>`, time && `<span class="ht-ev-fact">\ud83d\udd52 ${escapeHtml(time)}</span>`, price && `<span class="ht-ev-fact ht-ev-price">${escapeHtml(price)}</span>`].filter(Boolean);
+    return `${facts.length ? `<span class="ht-ev-facts">${facts.join('')}</span>` : ''}${desc ? `<span class="ht-ev-desc">${escapeHtml(desc)}</span>` : ''}`;
+  } catch (err) { return ''; }
+}
 function findHotel(slug) {
   return hotelList().find((h) => h.slug === slug) || null;
 }
@@ -36650,7 +36669,7 @@ function renderHotelPage(hotel, now = new Date()) {
     // An event's own photo (a file on this site) wins over the shared category photo (2026-11-27, Dayton: events cannot share one).
     if (own && /^\/images\/events\/[A-Za-z0-9._-]+$/.test(String(own).split('?')[0])) pic = String(own);
     else { try { pic = eventImagePath({ ...e, image_url: own }, e.categories || []); } catch (err) { pic = ''; } }
-    return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span></a></li>` : '';
+    return href ? `<li><a class="ht-event" href="${href}">${pic ? `<img src="${escapeHtml(pic)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(label)}</span><span class="ht-name">${escapeHtml(e.name)}</span>${hotelEventInfoHtml(e)}</a></li>` : '';
   };
   const title = hotelIsRental(hotel) ? `Things to Do Around ${town} for ${hotel.name} Guests | Okanagan Roam` : `Things to Do Near ${hotel.name}, ${town} | Okanagan Roam`;
   const description = hotelIsRental(hotel)
@@ -36801,6 +36820,9 @@ ${renderAnalyticsHeadHtml('hotel')}
   @media (prefers-reduced-motion: reduce) { body.hotel-page .ht-event img, body.hotel-page .ht-trip img { transition: none; } body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: none; } }
   body.hotel-page .ht-event .ht-meta, body.hotel-page .ht-trip .ht-meta { padding: 0 14px; font-size: 0.7rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #8A6A0F; opacity: 1; }
   body.hotel-page .ht-event .ht-name, body.hotel-page .ht-trip .ht-name { padding: 0 14px; font-size: 1.06rem; line-height: 1.25; letter-spacing: -0.01em; }
+  body.hotel-page .ht-event .ht-ev-facts { display: flex; flex-direction: column; gap: 3px; padding: 4px 14px 0; font-size: 0.88rem; line-height: 1.3; color: #3b4854; font-weight: 600; }
+  body.hotel-page .ht-event .ht-ev-price { color: #1d6b4a; font-weight: 800; }
+  body.hotel-page .ht-event .ht-ev-desc { padding: 6px 14px 0; font-size: 0.88rem; line-height: 1.4; color: #5b6772; }
   /* Badges are never cut mid-word (2026-11-28): they wrap, up to two rows; a badge that does not fit drops out whole. */
   body.hotel-page .ht-card .ht-tags { flex-wrap: wrap; overflow: hidden; max-width: 100%; max-height: 58px; }
   body.hotel-page .ht-card .ht-tags span { flex: none; white-space: nowrap; }
