@@ -21341,6 +21341,71 @@ const FOOTER_REGION_GROUPS = [
 // absolute, context-independent URL and is unaffected either way.
 // Every page except the homepage gets the short homepage-style footer (2026-11-28, Dayton). The homepage calls this with no
 // argument and still gets the full footer, which home-simple.js turns into its own short one.
+// Winter pass for the town pages (2026-11-28, Dayton): in the ski months (Nov-Apr) the header uses the town's winter photo, the
+// "Beaches & Lake" and "Golf" tiles give way to indoor ideas, cafés or pubs, tiles that showed a beach, pool or splash-park photo
+// get a real photo of another fitting place in the same town, and summer-only picks drop out. The other months are untouched.
+const TOWN_SUMMER_PHOTO = /\/images\/beaches\/|dog-beach|splash|spray|pool|water-?park|kayak|float|paddle|marina|golf/i;
+function townWinterOn(region, now = new Date()) { return hotelIsSkiMonth(now) && !HOTEL_SKI_REGIONS.includes(region); }
+function townWinterStyles(region, styles, now = new Date()) {
+  const w = townWinterOn(region, now) ? HOTEL_WINTER_PHOTOS[region] : null;
+  return w ? String(styles).replace(/(\.bw-hero\{[^}]*?url\(['"]?)[^'")]+(['"]?\))/, (m, a, b) => `${a}${w.src}${b}`) : styles;
+}
+function townWinterBody(region, html, now = new Date()) {
+  html = String(html);
+  // Photo credits from the page's own footer move to a small line above the short footer.
+  const credits = (html.match(/<p class="bw-credit">[\s\S]*?<\/p>/g) || []).map((c) => c.replace(/^<p class="bw-credit">|<\/p>$/g, ''));
+  const creditLine = (list) => (list.length ? `<p class="town-credits" style="max-width:1200px;margin:0 auto;padding:0 32px 18px;font-size:11px;line-height:1.5;color:#68716f">${list.join(' · ')}</p>` : '');
+  const withCredits = (h, list) => h.replace(/<footer class="bw-footer">/, (m) => creditLine(list) + m);
+  if (!townWinterOn(region, now)) return withCredits(html, credits);
+  try {
+    let closed = new Set();
+    try { closed = new Set(JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'hotel-seasonal-closed.json'), 'utf8')).ids || []); } catch (e) { /* none */ }
+    const rows = db.prepare("SELECT id, name, type, slug, image_url, rating, kid_friendly, dog_friendly FROM venues WHERE region = ? AND redirect_to IS NULL AND type != 'stay' AND image_url IS NOT NULL AND image_url != '' ORDER BY COALESCE(rating, 0) DESC, id").all(region)
+      .filter((v) => !closed.has(v.id) && v.type !== 'beach' && !HOTEL_SUMMER_ONLY.test(v.name || '') && !TOWN_SUMMER_PHOTO.test(v.image_url || '') && venueThumbPhoto(v));
+    // No photo twice on one page: the tiles' and picks' current photos count as used.
+    const fileOf = (src) => String(src || '').split('?')[0].split('/').pop().replace(/-w\d+(?=\.[a-z]+$)/, '');
+    const srcs = (re) => (html.match(re) || []).map((t) => fileOf(/src="([^"]*)"/.exec(t)[1]));
+    const usedTiles = new Set(srcs(/<a class="bw-tile"[^>]*><img[^>]*src="[^"]*"/g));
+    const used = new Set(srcs(/<img[^>]*src="[^"]*"/g));
+    // A photo already on a pick card is the last resort, a photo already on a tile is never reused.
+    const pick = (test) => { const v = rows.find((r) => !used.has(fileOf(r.image_url)) && test(r)) || rows.find((r) => !usedTiles.has(fileOf(r.image_url)) && test(r)); if (!v) return null; used.add(fileOf(v.image_url)); usedTiles.add(fileOf(v.image_url)); return venueThumbPhoto(v); };
+    const isType = (...types) => (v) => types.includes(v.type);
+    const tileRe = /<a class="bw-tile" href="([^"]*)"><img([^>]*?)src="([^"]*)"([^>]*)><b>([^<]*)<\/b><span>([^<]*)<\/span><\/a>/g;
+    const titles = new Set(); html.replace(tileRe, (m, h, a, src, b, title) => { titles.add(title); return m; });
+    const swaps = [
+      { title: 'Indoors &amp; Cozy', plain: 'Indoors & Cozy', sub: 'Warm ideas for cold days', href: `/indoor?regions=${region}`, test: isType('indoor') },
+      { title: 'Cafés', plain: 'Cafés', sub: 'Your coffee stop', href: `/cafes?regions=${region}`, test: isType('cafe') },
+      { title: 'Breweries &amp; Pubs', plain: 'Breweries & Pubs', sub: 'Pour yourself a pint', href: `/pubs?regions=${region}`, test: isType('pub', 'brewery') },
+    ];
+    html = html.replace(tileRe, (m, href, a, src, b, title, sub) => {
+      const t = title.replace(/&amp;/g, '&');
+      if (/^(Beaches & Lake|Golf)$/.test(t)) {
+        for (const sw of swaps) {
+          if (titles.has(sw.title) || titles.has(sw.plain)) continue;
+          const img = pick(sw.test);
+          if (!img) continue;
+          titles.add(sw.title); titles.add(sw.plain);
+          return `<a class="bw-tile" href="${sw.href}"><img${a}src="${escapeHtml(img)}"${b}><b>${sw.title}</b><span>${sw.sub}</span></a>`;
+        }
+        return m;
+      }
+      if (!TOWN_SUMMER_PHOTO.test(src)) return m;
+      const img = /^With Kids$/.test(t) ? (pick((v) => v.kid_friendly && v.type === 'indoor') || pick((v) => v.kid_friendly && v.type !== 'outdoor'))
+        : /^Dog-Friendly$/.test(t) ? (pick((v) => v.dog_friendly && v.type !== 'outdoor') || pick((v) => v.dog_friendly))
+        : /^Outdoor Adventures$/.test(t) ? pick(isType('outdoor'))
+        : /^Eat & Drink$/.test(t) ? pick(isType('restaurant', 'cafe', 'pub', 'brewery'))
+        : (pick(isType('indoor')) || pick(isType('pub', 'brewery', 'restaurant', 'cafe', 'winery')));
+      return img ? `<a class="bw-tile" href="${href}"><img${a}src="${escapeHtml(img)}"${b}><b>${title}</b><span>${sub}</span></a>` : m;
+    });
+    // Summer-only picks drop out, as long as three are left.
+    const pickRe = /<a class="bw-pick" href="\/[^"\/]+\/([^"\/]+)\/([^"\/]+)">[\s\S]*?<\/div><\/a>/g;
+    const all = html.match(pickRe) || [];
+    const bad = all.filter((p) => { const mm = /href="\/[^"\/]+\/([^"\/]+)\/([^"\/]+)"/.exec(p); const v = mm && db.prepare('SELECT id, name, type FROM venues WHERE region = ? AND slug = ?').get(region, mm[2]); return (mm && mm[1] === 'beaches') || (v && (closed.has(v.id) || v.type === 'beach' || HOTEL_SUMMER_ONLY.test(v.name || ''))); });
+    if (bad.length && all.length - bad.length >= 3) for (const p of bad) html = html.replace(p, '');
+    const w = HOTEL_WINTER_PHOTOS[region];
+    return withCredits(html, w && w.credit ? [...credits.filter((c) => !/^Hero photo/i.test(c)), `Header photo: ${escapeHtml(w.credit)}`] : credits);
+  } catch (err) { return withCredits(html, credits); }
+}
 // The town, ski-resort and Kelowna landing pages carry their own one-line footer; swap it for the short homepage-style one (2026-11-28, Dayton).
 function withShortFooter(html) {
   return require('./town-polish') + String(html).replace(/<footer class="bw-footer">[\s\S]*?<\/footer>/, () => renderHomeFooterHTML(true));
@@ -32351,11 +32416,11 @@ ${upcomingEvents.map((e) => {
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
-${kelownaPage.styles}
+${townWinterStyles(region, kelownaPage.styles)}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page kelowna-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${withShortFooter(kelownaPage.renderBody({ count: placeCount, activeSlugs }))}
+${withShortFooter(townWinterBody(region, kelownaPage.renderBody({ count: placeCount, activeSlugs })))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
@@ -32365,11 +32430,11 @@ ${GOLF_APP_SCRIPT_TAG}</body></html>`;
     return `<!DOCTYPE html><html lang="en"><head>
 ${pageHead(title, description, canonical, [breadcrumb, ...regionPageSchemas(region, regionLabel, description, canonical, categories)], { golfTheme: true, shareImage })}
 ${renderOutdoorThemeStyles()}
-${townPages.styles(region)}
+${townWinterStyles(region, townPages.styles(region))}
 ${golfEngagementHeadHtml('fd', true, 'region')}
 </head><body class="golf-page outdoor-page town-page">
 ${renderGolfTripTrayHtml()}<div id="floatingTooltip"></div>${renderGolfHeaderHtml()}
-${withShortFooter(townPages.renderBody(region, { count: placeCount, activeSlugs, officialHtml: regionOfficialLinkHtml(region).trim() }))}
+${withShortFooter(townWinterBody(region, townPages.renderBody(region, { count: placeCount, activeSlugs, officialHtml: regionOfficialLinkHtml(region).trim() })))}
 ${GOLF_APP_SCRIPT_TAG}</body></html>`;
   }
 
