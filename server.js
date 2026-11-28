@@ -21339,7 +21339,13 @@ const FOOTER_REGION_GROUPS = [
 // homepage's own anchors (/#exploreRegions, /#hiddenGems) instead of
 // leaving them dangling; every other link in this footer is already an
 // absolute, context-independent URL and is unaffected either way.
+// Every page except the homepage gets the short homepage-style footer (2026-11-28, Dayton). The homepage calls this with no
+// argument and still gets the full footer, which home-simple.js turns into its own short one.
 function renderHomeFooterHTML(fromBrowse) {
+  const full = renderHomeFooterFullHTML(fromBrowse);
+  return fromBrowse ? homeSimple.compactFooter(full) : full;
+}
+function renderHomeFooterFullHTML(fromBrowse) {
   const bestRegionForType = bestRegionForCategoryType();
   // Golf-wide fix (2026-09-19): same reasoning as renderMoodCardsHTML()'s
   // identical golfHref -- Golf venues span multiple regions, so this links
