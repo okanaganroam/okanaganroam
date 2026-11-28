@@ -35984,6 +35984,7 @@ const HOTEL_EMAIL_UTM = (slug) => `utm_source=hotel_email&utm_medium=email&utm_c
 // Winter day-trip photos (2026-11-27, Dayton): in the ski months a day-trip card shows a real winter photo of the town, never the
 // summer valley or marina. A town with no winter photo shows no picture rather than a summer one. All from Wikimedia Commons.
 const HOTEL_WINTER_PHOTOS = Object.freeze({
+  peachland: { src: '/images/regions/winter/peachland-2811.jpg', credit: 'Peachland: Antlers Beach in late winter, Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Antlers_Beach_Regional_Park_in_Late_Winter.JPG' },
   'okanagan-falls': { src: '/images/regions/winter/okanagan-falls-2711.jpg', credit: 'Okanagan Falls: Vaseux Lake, Richard McGuire, via Flickr', url: 'https://www.flickr.com/photos/richardmcguire/8733437991/' },
   coldstream: { src: '/images/regions/winter/coldstream-2711.jpg', credit: 'Coldstream: Kalamalka Lake, Extemporalist, CC0', url: 'https://commons.wikimedia.org/wiki/File:Looking_across_frozen_Kalamalka_Lake_from_Kaloya_Regional_Park.png' },
   armstrong: { src: '/images/regions/winter/armstrong-2711.jpg', credit: 'Armstrong: silasdavid, from Mount Rose Swanson', url: 'https://steemit.com/travel/@silasdavid/mount-rose-swanson-winter-hiking-adventure-armstrong-bc-canada' },
