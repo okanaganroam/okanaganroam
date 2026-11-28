@@ -36600,7 +36600,7 @@ function renderHotelPage(hotel, now = new Date()) {
     const bk = bookable.get(v.id) || null;
     if (bk) anyBookable = true;
     return `<li class="ht-card" data-venue-id="${v.id}" data-flags="${flags.join(' ')}">
-      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="270">` : ''}<span class="ht-meta">${escapeHtml(typeLabel)}${hotelIsRental(hotel) ? '' : ` · ${escapeHtml(hotelAwayText(km))}`}</span><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh">Happy hour: ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</a>
+      <a class="ht-link" href="/${v.region}/${CATEGORY_SLUGS[v.type]}/${v.slug}"><span class="ht-photo">${photo ? `<img src="${escapeHtml(photo)}" alt="" loading="lazy" width="480" height="300">` : ''}<span class="ht-cat">${escapeHtml(typeLabel)}</span>${hotelIsRental(hotel) ? '' : (() => { const away = hotelAwayText(km); return `<span class="ht-dist"><span aria-hidden="true">${/walk/.test(away) ? '\u{1F6B6}' : '\u{1F697}'}</span> ${escapeHtml(away)}</span>`; })()}</span><span class="ht-body"><span class="ht-name">${escapeHtml(v.name)}</span>${open ? `<span class="ht-open">${escapeHtml(status.text || 'Open now')}</span>` : opensSoon.has(v.id) ? `<span class="ht-soon">${escapeHtml(opensSoon.get(v.id))}</span>` : (() => { const hl = hotelHoursLine(v, status, now); return `<span class="${hl.open ? 'ht-open' : 'ht-soon'}">${escapeHtml(hl.text)}</span>`; })()}${hh ? `<span class="ht-hh"><b>Happy hour</b> ${escapeHtml(hh)}</span>` : ''}${tags.length ? `<span class="ht-tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}</span></a>
       <div class="ht-actions"><button type="button" class="card-action trip-btn" data-trip-name="${escapeHtml(v.name)}" data-trip-query="${escapeHtml(tripQuery)}" data-trip-region="${escapeHtml(v.region)}" data-trip-ref="venue:${v.id}" aria-pressed="false" aria-label="${escapeHtml(`Add ${v.name} to trip`)}">${APP_TRIP_LABEL_HTML}</button>${bk ? `<a class="ht-book-btn" href="${escapeHtml(bk.url)}" rel="sponsored noopener" target="_blank" data-track="booking" data-link="viator" data-viator-code="${escapeHtml(bk.code)}" aria-label="${escapeHtml(`Book ${v.name} on Viator`)}">Book now <span aria-hidden="true">\u2197</span></a>` : ''}</div>
     </li>`;
   };
@@ -36723,6 +36723,29 @@ ${renderAnalyticsHeadHtml('hotel')}
   body.hotel-page .ht-hh { margin: 4px 12px 0; font-size: 0.8rem; font-weight: 700; color: #7a4b00; }
   body.hotel-page .ht-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 12px 0; }
   body.hotel-page .ht-tags span { padding: 1px 7px; border-radius: 999px; background: #f3efe6; font-size: 0.72rem; font-weight: 700; }
+  /* Card polish (2026-11-28, Dayton: "more professional, fun, crisp"): photo-led card, category + distance on the photo, status with a dot, outline tags. */
+  body.hotel-page .ht-card { border: 0; border-radius: 20px; background: #fff; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 8px 24px rgba(27,43,58,0.10); }
+  body.hotel-page .ht-card .ht-link { gap: 0; padding: 0; }
+  body.hotel-page .ht-card .ht-photo { position: relative; display: block; aspect-ratio: 16 / 10; overflow: hidden; background: #e8edf2; }
+  body.hotel-page .ht-card .ht-photo img { width: 100%; height: 100%; margin: 0; object-fit: cover; display: block; transition: transform .45s ease; }
+  body.hotel-page .ht-card .ht-photo::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,20,30,0.55), rgba(10,20,30,0) 45%); pointer-events: none; }
+  @media (hover: hover) { body.hotel-page .ht-card:hover .ht-photo img { transform: scale(1.05); } }
+  @media (prefers-reduced-motion: reduce) { body.hotel-page .ht-card .ht-photo img { transition: none; } body.hotel-page .ht-card:hover .ht-photo img { transform: none; } }
+  body.hotel-page .ht-card .ht-cat { position: absolute; top: 10px; left: 10px; z-index: 1; max-width: calc(100% - 20px); padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,0.94); color: var(--ref-navy, #1B2B3A); font-size: 0.68rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 1px 4px rgba(0,0,0,0.12); }
+  body.hotel-page .ht-card .ht-dist { position: absolute; left: 12px; bottom: 9px; z-index: 1; color: #fff; font-size: 0.82rem; font-weight: 800; text-shadow: 0 1px 6px rgba(0,0,0,0.45); }
+  body.hotel-page .ht-card .ht-body { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 12px 14px 4px; }
+  body.hotel-page .ht-card .ht-name { padding: 0; font-size: 1.1rem; line-height: 1.22; letter-spacing: -0.01em; }
+  body.hotel-page .ht-card .ht-open, body.hotel-page .ht-card .ht-soon { display: inline-flex; align-items: baseline; gap: 6px; margin: 0; max-width: 100%; padding: 4px 10px; font-size: 0.78rem; line-height: 1.3; }
+  body.hotel-page .ht-card .ht-open::before, body.hotel-page .ht-card .ht-soon::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; transform: translateY(-1px); }
+  body.hotel-page .ht-card .ht-open::before { background: #22a04b; box-shadow: 0 0 0 3px rgba(34,160,75,0.18); }
+  body.hotel-page .ht-card .ht-soon { background: #f1f4f8; color: #3a4b5c; }
+  body.hotel-page .ht-card .ht-soon::before { background: #8a9aab; }
+  body.hotel-page .ht-card .ht-hh { margin: 0; padding: 6px 10px; border-radius: 12px; background: #fff4df; color: #6b4300; font-size: 0.8rem; line-height: 1.35; }
+  body.hotel-page .ht-card .ht-hh b { font-weight: 900; margin-right: 4px; }
+  body.hotel-page .ht-card .ht-tags { margin: 0; gap: 6px; }
+  body.hotel-page .ht-card .ht-tags span { padding: 3px 9px; background: #fff; border: 1px solid rgba(27,43,58,0.14); color: #3a4b5c; font-size: 0.72rem; font-weight: 700; }
+  body.hotel-page .ht-card .ht-actions { margin: 10px 14px 14px; }
+  body.hotel-page .ht-card .ht-book-btn { background: var(--ref-navy, #1B2B3A); color: #fff; border-color: var(--ref-navy, #1B2B3A); }
   body.hotel-page .ht-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; }
   body.hotel-page .ht-filters button { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--ref-navy, #1B2B3A); background: #fff; color: var(--ref-navy, #1B2B3A); font: inherit; font-weight: 800; cursor: pointer; }
   body.hotel-page .ht-filters button[aria-pressed="true"] { background: var(--ref-navy, #1B2B3A); color: #fff; }
