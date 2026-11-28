@@ -25146,6 +25146,26 @@ const CARD_V2_CSS = `<style id="card-v2">
   ${PRO_CARD} > .card-slot-notice .season-tag span { display: none; }
   ${PRO_CARD}:has(> .card-slot-notice .season-tag-closed)::before { filter: saturate(0.55) brightness(0.92); }
   @media (max-width: 640px) { ${PRO_CARD} { padding: calc(75% + 20px) 18px 16px !important; } ${PRO_CARD}::before { padding-bottom: 75% !important; } }
+  /* Card v3 (2026-11-28, Dayton: "professional, fun, crisp" like the guest page cards): rounder card with a soft shadow,
+     photo zoom on hover, open/closed as a tinted pill with a dot, outlined badge chips, a lighter "more features". CSS only. */
+  ${CARD_V2_CARD} { border: 0 !important; border-radius: 20px !important; background: #fff !important; overflow: hidden; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 8px 24px rgba(27,43,58,0.10) !important; transition: transform .18s ease, box-shadow .18s ease; }
+  ${CARD_V2_CARD}::before { border-radius: 20px 20px 0 0 !important; transition: transform .45s ease; transform-origin: 50% 40%; }
+  @media (hover: hover) { ${CARD_V2_CARD}:hover { transform: translateY(-3px); box-shadow: 0 2px 4px rgba(27,43,58,0.1), 0 14px 30px rgba(27,43,58,0.16) !important; } ${CARD_V2_CARD}:hover::before { transform: scale(1.04); } }
+  @media (prefers-reduced-motion: reduce) { ${CARD_V2_CARD}, ${CARD_V2_CARD}::before { transition: none; } ${CARD_V2_CARD}:hover, ${CARD_V2_CARD}:hover::before { transform: none; } }
+  ${CARD_V2_CARD} > h2 { font-size: 1.16rem; letter-spacing: -0.01em; }
+  ${CARD_V2_CARD} .fd-open-status { display: inline-flex !important; align-self: flex-start; width: auto; max-width: 100%; padding: 4px 11px 4px 10px; border-radius: 999px; background: #f1f4f8; font-size: 0.8rem; }
+  ${CARD_V2_CARD} .fd-open-status:is([data-fd-open="open"], [data-fd-open="public"]) { background: #e6f4ea; color: #1e6b34 !important; }
+  ${CARD_V2_CARD} .fd-open-status:is([data-fd-open="open"], [data-fd-open="public"])::before { background: #22a04b !important; box-shadow: none !important; width: 8px; height: 8px; }
+  ${CARD_V2_CARD} .fd-open-status[data-fd-open="closed"] { background: #fbeeea; }
+  ${CARD_V2_CARD} .fd-open-status:is([data-fd-open="appointment"], [data-fd-open="seasonal"]) { background: #fff4df; }
+  ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more) { padding: 3px 9px !important; border: 1px solid rgba(27,43,58,0.14) !important; border-radius: 999px !important; background: #fff !important; color: #3a4b5c !important; font-size: 0.72rem !important; font-weight: 700; }
+  ${CARD_V2_CARD} > .chips:not(:empty) { gap: 6px !important; }
+  ${CARD_V2_CARD} > .chips > .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more) ~ .chip:not(.hidden-gem-badge, .local-favourite-badge, .chip-more)::before { content: none !important; }
+  ${CARD_V2_CARD} > .chips > .chip.chip-more { margin-left: 0 !important; padding: 3px 8px !important; }
+  ${CARD_V2_CARD} .fd-extra-features { background: transparent !important; border: 0 !important; padding: 0 !important; margin: 0 0 10px !important; }
+  ${CARD_V2_CARD} .fd-extra-features > summary { display: inline-flex; align-items: center; gap: 6px; min-height: 0 !important; padding: 3px 10px !important; border: 0 !important; border-radius: 999px; background: #f1f4f8 !important; color: #3a4b5c; font-size: 0.74rem; line-height: 1.4; font-weight: 800; cursor: pointer; }
+  ${CARD_V2_CARD} .card-action.trip-btn { border-radius: 999px; }
+  ${CARD_V2_CARD} .fd-open-status::after { left: 10px !important; top: 50% !important; margin-top: -4px; }
 </style>
 <script id="card-v2-rows">(function () {
   // Rows line up (2026-11-01): the name, price line and badges match across a row. The description, value score and
