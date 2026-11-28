@@ -46,6 +46,43 @@ function renderContent({hero,mood,editors,events,gems,destinations,stats,footer,
  const footerHtml=renderFooter(footer||'');
  return `<div id="homeSimple"><main id="main"><section class="hero" id="heroScenic"><div class="hero-media" aria-hidden="true">${image}</div><div class="eyebrow">${bi('Local discoveries • Enderby to Osoyoos','Découvertes locales • D’Enderby à Osoyoos')}</div>${title}<p>${bi('Great food. Beautiful places. Something new to discover.<br>Your local guide to the whole valley.','Bonne bouffe. Beaux paysages. De nouvelles découvertes.<br>Votre guide local pour toute la vallée.')}</p><form class="quick-search" id="heroSearchForm" role="search" action="/browse" method="get"><input type="search" id="heroSearchInput" name="q" enterkeyhint="search" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="What are you looking for?" data-i18n-aria="search.mainLine" placeholder="Wineries, restaurants, hikes, beaches, hidden gems…" data-i18n-placeholder="search.subLine"><button class="pill" type="submit" id="heroSearchBtn"><span data-i18n="search.button">Search</span> →</button></form><div class="hero-actions"><a class="hero-action" href="/map#near-me"><span class="symbol" aria-hidden="true">◎</span><div><b><i class="live-dot" aria-hidden="true"></i>Roam Now</b><small>${bi('Find what’s open near you','Trouvez les endroits ouverts à proximité')}</small></div><span class="go" aria-hidden="true">→</span></a><a class="hero-action gold" href="/map?show=happy-hour"><span class="symbol" aria-hidden="true">◷</span><div><b><i class="live-dot" aria-hidden="true"></i>${bi('Happy Hour Now','5 à 7 en cours')}</b><small>${bi('Find a happy hour happening now','Trouvez un 5 à 7 en ce moment')}</small></div><span class="go" aria-hidden="true">→</span></a><a class="hero-action wide" id="heroTripCard" href="/trip"><span class="symbol" aria-hidden="true">✦</span><div><b>${bi('Build My Trip','Planifier mon voyage')}</b><small>${bi('Chat with our AI travel agent to build a custom itinerary and book accommodations, rental cars, and local spots across the Okanagan.','Discutez avec notre agent de voyage IA pour créer un itinéraire sur mesure et réserver hébergements, voitures de location et adresses locales dans l’Okanagan.')}</small></div><span class="go" aria-hidden="true">→</span></a></div><p class="hero-note">${bi('Explore now, plan a weekend, or find your next local favourite.','Explorez maintenant, planifiez une escapade ou trouvez votre prochain coup de cœur.')}</p></section><div class="proof">${stats}</div><div class="wrap">${section('moodCards',`<h2 data-i18n="mood.heading">What are you in the mood for?</h2>`,all('/categories','All categories →','Toutes les catégories →'),`<div class="categories${moodCount===6?' bento-mood':''}">${moodCards}</div>`)}${picksHtml}${eventCards.length?section('thisWeekend',`<h2>${bi('This Weekend','Cette fin de semaine')}</h2>`,all('/whats-on','All events →','Tous les événements →'),`<div class="events${eventCards.length>=4?' bento bento-b':''}">${(eventCards.length>=4?polish.featureSizes(eventCards):eventCards).join('')}</div>${weekendSignup}`):''}${section('hiddenGems',`<div><h2 data-i18n="gems.heading">Hidden Gems</h2><p class="sub" data-i18n="gems.subtitle">Less crowds. More Okanagan.</p></div>`,all('/hidden-gems','Explore more →','En découvrir plus →'),`<div class="gem-grid${gemCount===3?' bento-gems':''}">${gemCards}</div>`)}${section('exploreRegions',`<h2>${bi('Where will you roam?','Où irez-vous explorer?')}</h2>`,all('/destinations','All 20 destinations →','Les 20 destinations →'),`<div class="destination-grid">${regionCards}</div>`)}${polish.guidesSection(guides,bi)}<section class="trip-banner"${tripStyle}><div><div class="eyebrow">${bi('A day out. A weekend away. Your kind of trip.','Une journée. Une escapade. Un séjour à votre image.')}</div><h2>${bi('Build your Okanagan adventure.','Planifiez votre aventure dans l’Okanagan.')}</h2><p>${bi('Tell us what you enjoy. Build My Trip helps bring your food stops, activities and discoveries together.','Dites-nous ce que vous aimez. Build My Trip réunit vos pauses gourmandes, vos activités et vos découvertes.')}</p></div><a class="pill" href="/trip"><span data-i18n="trip.buildMyTrip">Build My Trip</span> →</a></section></div></main>${footerHtml}</div>`;
 }
+
+// The same short footer on every other page (2026-11-28, Dayton: "make the footer the same as the home pages, this is very long and a
+// wall of text"). Takes the long footer's HTML (its dialogs are kept) and returns the homepage footer with its own scoped styles.
+const compactFooterCss=`<style id="site-footer-compact-css">
+footer.site-footer-compact{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:25px;background:#1b2e39;color:#fff;padding:30px max(26px,calc((100vw - 1168px)/2)) 25px;font:16px/1.5 'Nunito',Arial,sans-serif;text-align:left;margin:0}
+footer.site-footer-compact .home-fr{display:none}
+html[lang="fr"] footer.site-footer-compact .home-en,html[data-page-lang="fr"] footer.site-footer-compact .home-en{display:none}
+html[lang="fr"] footer.site-footer-compact .home-fr,html[data-page-lang="fr"] footer.site-footer-compact .home-fr{display:initial}
+footer.site-footer-compact .logo{display:inline-block;font:700 23px 'Fraunces','Fraunces Fallback',Georgia,serif;white-space:nowrap;letter-spacing:0;color:#fff;text-decoration:none}
+footer.site-footer-compact .logo span{color:#E3B341}
+footer.site-footer-compact p{font-size:13px;color:#ccd3d3;margin:10px 0 0}
+footer.site-footer-compact summary{font-weight:700;font-size:15px;cursor:pointer;padding:8px 0;list-style:none;color:#fff}
+footer.site-footer-compact summary::-webkit-details-marker{display:none}
+footer.site-footer-compact .home-footer-fold{border:0;padding:0}
+footer.site-footer-compact details a{display:block;font-size:14px;color:#d8dddd;padding:5px 0;text-decoration:none}
+footer.site-footer-compact details a:hover{color:#E3B341}
+footer.site-footer-compact .footer-social-links{font-size:12px;padding:5px 0;white-space:normal}
+footer.site-footer-compact .footer-social-links a{display:inline;font-size:12px;padding:0}
+footer.site-footer-compact small{grid-column:1/-1;border-top:1px solid #ffffff20;padding-top:18px;color:#bac6c8;font-size:12px;line-height:1.7}
+footer.site-footer-compact small a{display:inline;color:inherit;text-decoration:none}
+footer.site-footer-compact .footer-app-link{border:0;background:none;padding:0;color:inherit;font:inherit;text-decoration:underline;cursor:pointer}
+@media(max-width:700px){
+footer.site-footer-compact{display:block;padding:25px 20px}
+footer.site-footer-compact .logo{font-size:18px}
+footer.site-footer-compact .footer-brand{padding-bottom:20px}
+footer.site-footer-compact .home-footer-fold{border-top:1px solid #ffffff25;padding:6px 0}
+footer.site-footer-compact summary{min-height:44px;display:flex;align-items:center;justify-content:space-between}
+footer.site-footer-compact summary:after{content:'+'}
+footer.site-footer-compact details[open] summary:after{content:'\\2212'}
+footer.site-footer-compact .home-footer-fold:not([open])>:not(summary){display:none!important}
+footer.site-footer-compact small{display:block;margin-top:12px}
+}
+</style>`;
+const compactFooterScript=`<script>(function(){var m=matchMedia('(max-width:700px)');function fold(){document.querySelectorAll('footer.site-footer-compact .home-footer-fold').forEach(function(d){d.open=!m.matches})}fold();m.addEventListener('change',fold)})();</script>`;
+function compactFooter(legacy){
+ return compactFooterCss+renderFooter(legacy).replace('<footer class="footer">','<footer class="site-footer-compact">').replace(/<a href="\/fr"[^>]*data-home-language>[\s\S]*?<\/a>/,'')+compactFooterScript;
+}
 const footerScript=`<script>(function(){var m=matchMedia('(max-width:700px)');function fold(){document.querySelectorAll('#homeSimple .home-footer-fold').forEach(function(d){d.open=!m.matches})}fold();m.addEventListener('change',fold)})();</script>`;
 // The legacy button relies on indexable alternate links, which may be disabled.
 const languageScript=`<script id="home-simple-language">document.addEventListener('click',function(e){var t=e.target.closest&&e.target.closest('#langToggle,[data-home-language]');if(!t)return;e.preventDefault();e.stopImmediatePropagation();var fr=document.documentElement.getAttribute('data-page-lang')!=='fr';try{localStorage.setItem('okanaganLang',fr?'fr':'en')}catch(_){}if(window.trackEvent)window.trackEvent('language_change',{language:fr?'fr':'en'});location.assign(fr?'/fr':'/')},true);</script>`;
@@ -55,4 +92,4 @@ function apply(html,parts){
  const footer=(html.match(/<footer class="home-footer">[\s\S]*?<\/footer>/)||[])[0]||'';
  return html.replace(footer,'').replace(match[0],renderContent({...parts,hero,footer})+footerScript+languageScript+(parts&&parts.guides?polish.guidesScript:'')).replace('</head>',styles+'</head>');
 }
-module.exports={renderContent,styles,apply};
+module.exports={renderContent,styles,apply,compactFooter};
