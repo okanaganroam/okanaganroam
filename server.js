@@ -36015,6 +36015,8 @@ function hotelIsSkiMonth(now = new Date()) { const m = Number(new Date(now).toLo
 // camping or lake recreation sites; at a ski hill a lake is left out too.
 const HOTEL_SUMMER_ONLY = /\b(summer|beach(es)?|swim(ming)?|boat(ing)?|cruises?|tiki|kayak(s|ing)?|paddle(board(ing)?)?|sup|reservoir|lake ?shore|waterfront|marina|splash|water ?(park|slide|sports?)|jet ?ski|wake ?board(ing)?|camp(ground|ing|site)s?|recreation site|lake tours?|lake cruises?)\b/i;
 // At a ski hill in the ski months, warm-weather activities go too: golf and disc golf, hiking, mountain biking, rafting, lakes.
+// Outdoor rock climbing (crags, boulders) is a summer offering: off guest pages in the winter months (2026-11-28, Dayton). Indoor gyms are type 'indoor' and stay.
+const HOTEL_CLIMB_OUTDOOR = /\b(crags?|boulders?|bouldering|climbing (boulder|walls?|area)|alpine rock|rock climbing)\b/i;
 const HOTEL_SKI_SUMMER = /\b(lake|golf|disc golf|hik(e|es|ing)|mountain bik(e|es|ing)|bike park|zip ?lines?|rafting|canoe(ing)?|skate ?parks?|skatepark|pickleball|tennis|bmx|kart(plex)?|pump ?track|rock garden|rose garden|channel walk)\b/i;
 // At a ski hill in the ski months the outdoors row keeps only the places that make sense in snow (2026-11-27, Dayton: Apex was offering summer parks and trails).
 const HOTEL_SKI_WINTER_OK = /\b(ski|skiing|snow\w*|nordic|skat(e|es|ing)|tube|tubing|sleigh|sled(ding)?|toboggan\w*|cross[- ]country|ice|winter|fat ?bike|resort|provincial park)\b/i;
@@ -36024,7 +36026,7 @@ function hotelPageGroups(hotel, venues, info, closedIds, opensSoon = new Map(), 
   const used = new Set();
   const ski = hotelIsSkiHill(hotel), winter = hotelIsSkiMonth(now);
   // The right season only (2026-11-27 rule, Dayton): nothing for the wrong season is offered on a guest page.
-  const outOfSeason = (v, key) => (winter ? (HOTEL_SUMMER_ONLY.test(v.name || '') || (ski && (HOTEL_SKI_SUMMER.test(v.name || '') || v.type === 'golf' || (key === 'do' && !HOTEL_SKI_WINTER_OK.test(v.name || ''))))) : HOTEL_WINTER_ONLY.test(v.name || ''));
+  const outOfSeason = (v, key) => (winter ? (HOTEL_SUMMER_ONLY.test(v.name || '') || (v.type !== 'indoor' && HOTEL_CLIMB_OUTDOOR.test(v.name || '') && !/\b(gym|co-?op|centre|center|fitness)\b/i.test(v.name || '')) || (ski && (HOTEL_SKI_SUMMER.test(v.name || '') || v.type === 'golf' || (key === 'do' && !HOTEL_SKI_WINTER_OK.test(v.name || ''))))) : HOTEL_WINTER_ONLY.test(v.name || ''));
   return HOTEL_PAGE_GROUPS.map((g0) => {
     const g = g0.key === 'do' && (ski || winter) ? { ...g0, title: ski ? 'Outdoors and things to do' : 'Parks, trails and outdoors', types: ['outdoor'] } : ski && g0.key === 'activities' ? { ...g0, title: 'Tours and activities' } : g0;
     const rows = venues
