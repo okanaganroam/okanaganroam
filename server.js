@@ -35977,6 +35977,14 @@ function hotelTitleLine(hotel) {
 function findHotel(slug) {
   return hotelList().find((h) => h.slug === slug) || null;
 }
+// One plain line under each section title saying what is in it (2026-11-28, Dayton: titles should be noticeable and explain the category).
+const HOTEL_GROUP_SUB = {
+  eat: 'Restaurants, cafés, pubs and breweries close by',
+  wine: 'Tasting rooms and vineyards a short drive away',
+  do: 'Parks, trails, viewpoints and outdoor spots',
+  indoor: 'Museums, galleries and things to do when it is cold or wet',
+  activities: 'Guided tours, sports and golf you can book',
+};
 const HOTEL_PAGE_GROUPS = [
   { key: 'eat', title: 'Eat and drink nearby', types: ['restaurant', 'cafe', 'pub', 'brewery', 'cocktail', 'distillery'], maxKm: 8, limit: 8 },
   { key: 'wine', title: 'Wineries nearby', types: ['winery'], maxKm: 25, limit: 6 },
@@ -36779,7 +36787,10 @@ ${renderAnalyticsHeadHtml('hotel')}
   /* Page polish (2026-11-28, Dayton: "sharp, crisp and professional, easy to use"): events and day-trip cards match the place cards,
      tidy rows on wide screens, clearer section headings and buttons. CSS only. */
   body.hotel-page .ht-group { margin-top: 34px; }
-  body.hotel-page .ht-group > h2, body.hotel-page h2[id^="ht-"] { font-size: clamp(1.3rem, 4.6vw, 1.6rem); letter-spacing: -0.01em; margin-bottom: 14px; }
+  body.hotel-page .ht-group > h2, body.hotel-page h2[id^="ht-"] { font-size: clamp(1.7rem, 6.4vw, 2.15rem); font-weight: 800; line-height: 1.12; letter-spacing: -0.02em; color: #1B2B3A; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; }
+  body.hotel-page h2[id^="ht-"]::before { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 1.55em; height: 1.55em; margin-right: 0 !important; border-radius: 14px; background: #fff4df; font-size: 0.78em; box-shadow: inset 0 0 0 1px rgba(27,43,58,0.08); }
+  body.hotel-page .ht-sub { margin: 0 0 16px; font-size: 1.02rem; line-height: 1.4; color: #5b6772; }
+  body.hotel-page h2[id^="ht-"] + .ht-list, body.hotel-page h2[id^="ht-"] + .ht-events, body.hotel-page h2[id^="ht-"] + .ht-trips { margin-top: 14px; }
   body.hotel-page .ht-event, body.hotel-page .ht-trip { border: 0; border-radius: 20px; gap: 4px; padding: 0 0 14px; box-shadow: 0 1px 2px rgba(27,43,58,0.06), 0 8px 24px rgba(27,43,58,0.10); }
   body.hotel-page .ht-event img, body.hotel-page .ht-trip img { height: auto; aspect-ratio: 16 / 10; object-fit: cover; margin: 0 0 10px; background: #e8edf2; transition: transform .45s ease; }
   @media (hover: hover) { body.hotel-page .ht-event:hover img, body.hotel-page .ht-trip:hover img { transform: scale(1.05); } }
@@ -36910,7 +36921,7 @@ ${renderGolfHeaderHtml()}
   </div>
   ${filters.length ? `<div class="ht-filters" role="group" aria-label="Show only"><button type="button" data-ht-filter="all" aria-pressed="true">Everything</button>${filters.map((f) => `<button type="button" data-ht-filter="${f.key}" aria-pressed="false">${escapeHtml(f.label)}</button>`).join('')}</div><p class="ht-none" id="htNone" hidden>Nothing nearby matches that right now. Try another filter.</p>` : ''}
   ${groups.map((g) => `<section class="ht-section ht-group" aria-labelledby="ht-${g.key}">
-    <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>
+    <h2 id="ht-${g.key}">${escapeHtml(g.title)}</h2>${HOTEL_GROUP_SUB[g.key] ? `<p class="ht-sub">${escapeHtml(HOTEL_GROUP_SUB[g.key])}</p>` : ''}
     <ul class="ht-list">${g.items.map(({ v, km }) => card(v, km)).join('')}</ul>
     ${g.more && g.more.length ? `<details class="ht-events-more ht-places-more"><summary>View all ${g.more.length + g.items.length} ${escapeHtml(g.key === 'eat' ? 'places to eat and drink' : g.title.toLowerCase())}</summary><ul class="ht-list ht-list-more">${g.more.map(({ v, km }) => card(v, km)).join('')}</ul></details>` : ''}
   </section>`).join('\n  ')}
