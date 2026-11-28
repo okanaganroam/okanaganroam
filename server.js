@@ -36521,7 +36521,22 @@ function renderHotelPage(hotel, now = new Date()) {
     const row = st.kind === 'closed' ? seasonRows.get(id) : null;
     if (!row || notOperating.has(id)) continue;
     if (row.reopens_date && row.reopens_date >= today0 && row.reopens_date <= addLocalDays(today0, HOTEL_OPENS_SOON_DAYS)) opensSoon.set(id, `Opens ${formatLocalDateShort(row.reopens_date, { weekday: false })}`);
-    else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) opensSoon.set(id, 'Opens for the ski season');
+    else if (!row.reopens_date && SKI_RESORT_REGIONS.has(hotel.region) && regionOf.get(id) === hotel.region) {
+      // 2026-11-27 (Dayton): a hill place waiting on the resort shows the resort's opening day and its own hours that day, not just "Opens for the ski season".
+      const hillOpens = SKI_RESORT_SEASON[hotel.region] && SKI_RESORT_SEASON[hotel.region].opens;
+      const hv = venues.find((x) => x.id === id);
+      let lbl = 'Opens for the ski season';
+      if (hillOpens && hillOpens >= today0) {
+        lbl = `Opens ${formatLocalDateShort(hillOpens, { weekday: false })}`;
+        try {
+          const dk = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][new Date(`${hillOpens}T12:00:00Z`).getUTCDay()];
+          const iv = hv && hv.hours ? (typeof hv.hours === 'string' ? JSON.parse(hv.hours) : hv.hours)[dk] : null;
+          const fmt = (t) => { const [h, m] = t.split(':').map(Number); const hh = h % 12 || 12; return `${hh}${m ? ':' + String(m).padStart(2, '0') : ''} ${h < 12 || h === 24 ? 'AM' : 'PM'}`; };
+          if (iv && iv[0] && iv[0][0] && iv[0][1] && iv[0][1] !== '23:59') lbl += ` \u00b7 ${fmt(iv[0][0])}\u2013${fmt(iv[0][1])}`;
+        } catch (e) { /* label stays as the date only */ }
+      }
+      opensSoon.set(id, lbl);
+    }
   }
   const info = foodDrinkOpenNowInfo(venues, getAdvisoryNotes(now), now);
   const groups = hotelPageGroups(hotel, venues, info, closedIds, opensSoon, now);
